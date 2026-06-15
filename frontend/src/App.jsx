@@ -1,0 +1,51 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from '@/context/AuthContext'
+import { CartProvider } from '@/context/CartContext'
+import ProtectedRoute from '@/components/ProtectedRoute'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
+import Home from '@/pages/Home'
+import Product from '@/pages/Product'
+import Checkout from '@/pages/Checkout'
+import OrderSuccess from '@/pages/OrderSuccess'
+import AdminLogin from '@/pages/admin/Login'
+import Dashboard from '@/pages/admin/Dashboard'
+
+function PublicLayout({ children }) {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Header />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <CartProvider>
+          <Routes>
+            {/* Public routes with header/footer */}
+            <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
+            <Route path="/product/:id" element={<PublicLayout><Product /></PublicLayout>} />
+            <Route path="/checkout" element={<PublicLayout><Checkout /></PublicLayout>} />
+            <Route path="/order-success" element={<PublicLayout><OrderSuccess /></PublicLayout>} />
+
+            {/* Admin routes — no public layout */}
+            <Route path="/admin" element={<AdminLogin />} />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </CartProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}
