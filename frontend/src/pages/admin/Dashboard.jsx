@@ -49,6 +49,33 @@ function downloadCsv(rows, filename, cols) {
   URL.revokeObjectURL(url)
 }
 
+// ── Shared pagination bar ─────────────────────────────────
+function PaginationBar({ page, totalPages, total, pageSize, onPage, onPageSize }) {
+  if (total === 0) return null
+  return (
+    <div className="flex items-center justify-between gap-3 flex-wrap border-t border-border px-3 py-2.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5">
+        <span>প্রতি পেজে</span>
+        <select
+          value={pageSize}
+          onChange={e => { onPageSize(Number(e.target.value)); onPage(1) }}
+          className="rounded border border-border bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <span>· মোট {total}টি</span>
+      </div>
+      <div className="flex items-center gap-0.5">
+        <button onClick={() => onPage(1)}           disabled={page === 1}          className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 font-mono">«</button>
+        <button onClick={() => onPage(page - 1)}    disabled={page === 1}          className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 font-mono">‹</button>
+        <span className="px-3 font-medium text-foreground">{page} / {totalPages || 1}</span>
+        <button onClick={() => onPage(page + 1)}    disabled={page >= totalPages}  className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 font-mono">›</button>
+        <button onClick={() => onPage(totalPages)}  disabled={page >= totalPages}  className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 font-mono">»</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Mock chart data ───────────────────────────────────────
 const REVENUE_DATA = [
   { month: 'জানু', revenue: 42000, orders: 28 },
@@ -68,12 +95,14 @@ function OrdersTab() {
   const [expanded, setExpanded]     = useState({})
   const [deleting, setDeleting]     = useState(null)
   const [confirmId, setConfirmId]   = useState(null)
-  const [selected, setSelected]     = useState(new Set())
+  const [selected, setSelected]       = useState(new Set())
   const [bulkConfirm, setBulkConfirm] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [page, setPage]               = useState(1)
+  const [pageSize, setPageSize]       = useState(20)
 
   const fetchOrders = useCallback(() => {
-    setLoading(true); setSelected(new Set())
+    setLoading(true); setSelected(new Set()); setPage(1)
     api.getOrders()
       .then(setOrders)
       .catch(e => setError(e.message))
@@ -90,7 +119,13 @@ function OrdersTab() {
   }
 
   function toggleSelectAll() {
-    setSelected(prev => prev.size === orders.length ? new Set() : new Set(orders.map(o => o.id)))
+    const pageIds = paginated.map(o => o.id)
+    const allPageSelected = pageIds.every(id => selected.has(id))
+    setSelected(prev => {
+      const next = new Set(prev)
+      allPageSelected ? pageIds.forEach(id => next.delete(id)) : pageIds.forEach(id => next.add(id))
+      return next
+    })
   }
 
   async function handleDelete() {
@@ -140,8 +175,10 @@ function OrdersTab() {
     finally { setChangingStatus(null) }
   }
 
-  const allSelected  = orders.length > 0 && selected.size === orders.length
-  const someSelected = selected.size > 0 && !allSelected
+  const totalPages   = Math.max(1, Math.ceil(orders.length / pageSize))
+  const paginated    = orders.slice((page - 1) * pageSize, page * pageSize)
+  const allSelected  = paginated.length > 0 && paginated.every(o => selected.has(o.id))
+  const someSelected = paginated.some(o => selected.has(o.id)) && !allSelected
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
   if (error)   return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
@@ -221,7 +258,7 @@ function OrdersTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map(order => (
+              {paginated.map(order => (
                 <React.Fragment key={order.id}>
                   <TableRow
                     className={`cursor-pointer transition-colors ${selected.has(order.id) ? 'bg-primary/5' : ''}`}
@@ -301,6 +338,10 @@ function OrdersTab() {
               ))}
             </TableBody>
           </Table>
+          <PaginationBar
+            page={page} totalPages={totalPages} total={orders.length}
+            pageSize={pageSize} onPage={setPage} onPageSize={setPageSize}
+          />
         </div>
       )}
 
@@ -366,26 +407,31 @@ function ImageField({ value, onChange, uploading }) {
 
 // ── Products Tab ──────────────────────────────────────────
 function ProductsTab() {
-  const [products, setProducts]       = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [error, setError]             = useState(null)
-  const [deleting, setDeleting]       = useState(null)
-  const [confirmId, setConfirmId]     = useState(null)
-  const [adding, setAdding]           = useState(false)
-  const [addError, setAddError]       = useState(null)
+  const [products, setProducts]         = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState(null)
+  const [deleting, setDeleting]         = useState(null)
+  const [confirmId, setConfirmId]       = useState(null)
+  const [adding, setAdding]             = useState(false)
+  const [addError, setAddError]         = useState(null)
   const [uploadingAdd, setUploadingAdd] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
-  const [saving, setSaving]           = useState(false)
-  const [editError, setEditError]     = useState(null)
+  const [saving, setSaving]             = useState(false)
+  const [editError, setEditError]       = useState(null)
   const [uploadingEdit, setUploadingEdit]     = useState(false)
   const [uploadingReview, setUploadingReview] = useState(false)
+  const [selected, setSelected]         = useState(new Set())
+  const [bulkConfirm, setBulkConfirm]   = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [page, setPage]                 = useState(1)
+  const [pageSize, setPageSize]         = useState(20)
 
   const emptyForm = { name: '', description: '', price: '', image_url: '', video_url: '', stock: '', cross_sell_ids: '', review_type: 'text', review_images: [] }
   const [form, setForm]         = useState(emptyForm)
   const [editForm, setEditForm] = useState(emptyForm)
 
   const fetchProducts = useCallback(() => {
-    setLoading(true)
+    setLoading(true); setSelected(new Set()); setPage(1)
     api.getProducts()
       .then(setProducts)
       .catch(e => setError(e.message))
@@ -475,12 +521,43 @@ function ProductsTab() {
     try {
       await api.deleteProduct(confirmId)
       setProducts(prev => prev.filter(p => p.id !== confirmId))
+      setSelected(prev => { const next = new Set(prev); next.delete(confirmId); return next })
     } catch (e) {
       setError(e.message)
     } finally {
       setDeleting(null)
     }
   }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true); setBulkConfirm(false)
+    const ids = [...selected]
+    try {
+      await Promise.all(ids.map(id => api.deleteProduct(id)))
+      setProducts(prev => prev.filter(p => !ids.includes(p.id)))
+      setSelected(new Set())
+    } catch (e) { setError(e.message) }
+    finally { setBulkDeleting(false) }
+  }
+
+  function toggleSelect(id) {
+    setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+
+  function toggleSelectAll() {
+    const pageIds = prodPage.map(p => p.id)
+    const allPageSelected = pageIds.every(id => selected.has(id))
+    setSelected(prev => {
+      const next = new Set(prev)
+      allPageSelected ? pageIds.forEach(id => next.delete(id)) : pageIds.forEach(id => next.add(id))
+      return next
+    })
+  }
+
+  const totalPages    = Math.max(1, Math.ceil(products.length / pageSize))
+  const prodPage      = products.slice((page - 1) * pageSize, page * pageSize)
+  const allSelected   = prodPage.length > 0 && prodPage.every(p => selected.has(p.id))
+  const someSelected  = prodPage.some(p => selected.has(p.id)) && !allSelected
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
 
@@ -529,6 +606,20 @@ function ProductsTab() {
         </CardContent>
       </Card>
 
+      {/* Product list toolbar */}
+      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+        <p className="text-sm text-muted-foreground">
+          মোট {products.length}টি পণ্য
+          {selected.size > 0 && <span className="ml-2 font-semibold text-foreground">· {selected.size}টি নির্বাচিত</span>}
+        </p>
+        {selected.size > 0 && (
+          <Button variant="destructive" size="sm" disabled={bulkDeleting} onClick={() => setBulkConfirm(true)} className="gap-2">
+            {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {selected.size}টি মুছুন
+          </Button>
+        )}
+      </div>
+
       {/* Product list */}
       {products.length === 0 ? (
         <p className="text-center py-10 text-muted-foreground">কোনো পণ্য নেই।</p>
@@ -537,6 +628,15 @@ function ProductsTab() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10 px-3">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected }}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 cursor-pointer accent-primary"
+                  />
+                </TableHead>
                 <TableHead className="w-16">ছবি</TableHead>
                 <TableHead>নাম</TableHead>
                 <TableHead>মূল্য</TableHead>
@@ -545,8 +645,16 @@ function ProductsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map(p => (
-                <TableRow key={p.id}>
+              {prodPage.map(p => (
+                <TableRow key={p.id} className={selected.has(p.id) ? 'bg-primary/5' : ''}>
+                  <TableCell className="px-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(p.id)}
+                      onChange={() => toggleSelect(p.id)}
+                      className="h-4 w-4 cursor-pointer accent-primary"
+                    />
+                  </TableCell>
                   <TableCell>
                     {p.image_url
                       ? <img src={p.image_url} alt={p.name} className="h-10 w-10 rounded object-cover border" />
@@ -573,6 +681,10 @@ function ProductsTab() {
               ))}
             </TableBody>
           </Table>
+          <PaginationBar
+            page={page} totalPages={totalPages} total={products.length}
+            pageSize={pageSize} onPage={setPage} onPageSize={setPageSize}
+          />
         </div>
       )}
 
@@ -696,6 +808,7 @@ function ProductsTab() {
       </Dialog>
 
       {/* Delete confirmation */}
+      {/* Single delete */}
       <Dialog open={!!confirmId} onOpenChange={() => setConfirmId(null)}>
         <DialogContent>
           <DialogHeader>
@@ -705,6 +818,24 @@ function ProductsTab() {
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">বাতিল</Button></DialogClose>
             <Button variant="destructive" onClick={handleDelete}>হ্যাঁ, মুছুন</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk delete */}
+      <Dialog open={bulkConfirm} onOpenChange={setBulkConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selected.size}টি পণ্য মুছবেন?</DialogTitle>
+            <DialogDescription>
+              নির্বাচিত {selected.size}টি পণ্য চিরতরে মুছে ফেলা হবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">বাতিল</Button></DialogClose>
+            <Button variant="destructive" onClick={handleBulkDelete} className="gap-2">
+              <Trash2 className="h-4 w-4" /> হ্যাঁ, {selected.size}টি মুছুন
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
