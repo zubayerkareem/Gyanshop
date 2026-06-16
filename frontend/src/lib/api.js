@@ -59,4 +59,8 @@ export const api = {
   adminAddCategory:      (body)     => request('/api/admin/categories', { method: 'POST', body: JSON.stringify(body) }),
   adminUpdateCategory:   (id, body) => request(`/api/admin/categories?id=${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   adminDeleteCategory:   (id)       => request(`/api/admin/categories?id=${id}`, { method: 'DELETE' }),
+
+  // Pages admin
+  adminGetPages:   ()           => request('/api/admin/pages'),
+  adminUpdatePage: (slug, body) => request(`/api/admin/pages?slug=${slug}`, { method: 'PUT', body: JSON.stringify(body) }),
 }

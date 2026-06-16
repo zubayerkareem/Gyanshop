@@ -23,7 +23,7 @@ import {
   LogOut, Trash2, Plus, Loader2, ChevronDown, ChevronUp, Package,
   ShoppingBag, Settings, Pencil, Upload, ImageIcon, LayoutTemplate,
   LayoutDashboard, ShoppingCart, TrendingUp, Users, DollarSign,
-  Menu, X, ChevronRight, ArrowUpRight, Clock, LayoutGrid,
+  Menu, X, ChevronRight, ArrowUpRight, Clock, LayoutGrid, FileText,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -787,6 +787,13 @@ const LINK_COLS = [
   { key: 'footer_links_policy',  label: 'ক্রেতা নীতি' },
 ]
 
+function normalizeLinkItems(raw) {
+  let items = raw
+  if (typeof items === 'string') { try { items = JSON.parse(items) } catch { items = [] } }
+  if (!Array.isArray(items)) return []
+  return items.map(it => typeof it === 'string' ? { label: it, slug: '' } : it)
+}
+
 function FooterTab() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
@@ -798,26 +805,17 @@ function FooterTab() {
     footer_phone: '', footer_email: '', footer_facebook: '',
     footer_twitter: '', footer_instagram: '', footer_copyright: '',
   })
-  const [linkTexts, setLinkTexts] = useState({
-    footer_links_info: '', footer_links_support: '', footer_links_policy: '',
+  const [linkItems, setLinkItems] = useState({
+    footer_links_info: [], footer_links_support: [], footer_links_policy: [],
   })
 
   useEffect(() => {
     api.getFooterAdmin()
       .then(data => {
         setFields(prev => ({ ...prev, ...Object.fromEntries(Object.entries(data).filter(([k]) => !k.startsWith('footer_links_') && !k.startsWith('meta_'))) }))
-        const lt = {}
-        LINK_COLS.forEach(({ key }) => {
-          const val = data[key]
-          let items = []
-          if (Array.isArray(val)) {
-            items = val
-          } else if (typeof val === 'string') {
-            try { items = JSON.parse(val) } catch { items = [] }
-          }
-          lt[key] = Array.isArray(items) ? items.join('\n') : ''
-        })
-        setLinkTexts(lt)
+        const li = {}
+        LINK_COLS.forEach(({ key }) => { li[key] = normalizeLinkItems(data[key]) })
+        setLinkItems(li)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -826,6 +824,15 @@ function FooterTab() {
   function handleField(e) {
     setFields(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
+  function updateLink(key, idx, field, val) {
+    setLinkItems(prev => ({ ...prev, [key]: prev[key].map((it, i) => i === idx ? { ...it, [field]: val } : it) }))
+  }
+  function addLink(key) {
+    setLinkItems(prev => ({ ...prev, [key]: [...prev[key], { label: '', slug: '' }] }))
+  }
+  function removeLink(key, idx) {
+    setLinkItems(prev => ({ ...prev, [key]: prev[key].filter((_, i) => i !== idx) }))
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -833,9 +840,7 @@ function FooterTab() {
     try {
       const payload = { ...fields }
       LINK_COLS.forEach(({ key }) => {
-        payload[key] = JSON.stringify(
-          linkTexts[key].split('\n').map(l => l.trim()).filter(Boolean)
-        )
+        payload[key] = JSON.stringify(linkItems[key].filter(it => it.label.trim()))
       })
       await api.saveFooter(payload)
       setSuccess(true)
@@ -891,22 +896,55 @@ function FooterTab() {
         </CardContent>
       </Card>
 
-      {/* Link columns */}
+      {/* Link columns — label + slug editor */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">ফুটার লিংক কলাম</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">প্রতিটি লাইনে একটি করে লিংক লেবেল লিখুন।</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            লেবেল = ফুটারে দেখানো নাম। স্লাগ = পেজের URL (যেমন: <code className="bg-muted px-1 rounded text-[11px]">about</code>, <code className="bg-muted px-1 rounded text-[11px]">faq</code>)
+          </p>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
+        <CardContent className="grid gap-8 sm:grid-cols-3">
           {LINK_COLS.map(col => (
-            <div key={col.key} className="space-y-1.5">
-              <Label>{col.label}</Label>
-              <Textarea
-                rows={6}
-                value={linkTexts[col.key]}
-                onChange={e => setLinkTexts(prev => ({ ...prev, [col.key]: e.target.value }))}
-                placeholder={'লিংক ১\nলিংক ২\nলিংক ৩'}
-              />
+            <div key={col.key} className="space-y-3">
+              <p className="text-sm font-semibold text-foreground">{col.label}</p>
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_120px_32px] gap-1.5 mb-1">
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">লেবেল</span>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">স্লাগ</span>
+                  <span />
+                </div>
+                {linkItems[col.key].map((item, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_120px_32px] gap-1.5 items-center">
+                    <Input
+                      value={item.label}
+                      onChange={e => updateLink(col.key, i, 'label', e.target.value)}
+                      placeholder="লেবেল"
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      value={item.slug}
+                      onChange={e => updateLink(col.key, i, 'slug', e.target.value)}
+                      placeholder="about"
+                      className="h-8 text-[11px] font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeLink(col.key, i)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => addLink(col.key)}
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Plus className="h-3.5 w-3.5" /> লিংক যোগ করুন
+              </button>
             </div>
           ))}
         </CardContent>
@@ -917,6 +955,102 @@ function FooterTab() {
         ফুটার সংরক্ষণ করুন
       </Button>
     </form>
+  )
+}
+
+// ── Pages Tab ─────────────────────────────────────────────
+function PagesTab() {
+  const [pages, setPages]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(null)
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState(null)
+  const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    api.adminGetPages()
+      .then(setPages)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true); setError(null); setSuccess(false)
+    try {
+      await api.adminUpdatePage(editing.slug, { title: editing.title, content: editing.content })
+      setPages(prev => prev.map(p => p.slug === editing.slug ? { ...p, title: editing.title, content: editing.content } : p))
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
+
+  return (
+    <div className="space-y-6">
+      {error   && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {success && <Alert className="border-green-200 bg-green-50 text-green-800"><AlertDescription>পেজ সফলভাবে সংরক্ষিত হয়েছে।</AlertDescription></Alert>}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {pages.map(page => (
+          <button
+            key={page.slug}
+            onClick={() => { setEditing({ ...page }); setSuccess(false); setError(null) }}
+            className={`text-left rounded-lg border p-4 transition-all hover:border-primary hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${editing?.slug === page.slug ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+          >
+            <p className="text-xs font-mono text-muted-foreground mb-1">{page.slug}</p>
+            <p className="text-sm font-semibold text-foreground leading-snug">{page.title}</p>
+          </button>
+        ))}
+      </div>
+
+      {editing && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">{editing.title} সম্পাদনা</CardTitle>
+              <code className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground">/page/{editing.slug}</code>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>পেজ শিরোনাম</Label>
+                <Input
+                  value={editing.title}
+                  onChange={e => setEditing(prev => ({ ...prev, title: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>পেজের বিষয়বস্তু</Label>
+                <Textarea
+                  rows={12}
+                  value={editing.content || ''}
+                  onChange={e => setEditing(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="পেজের কন্টেন্ট লিখুন..."
+                  className="font-sans text-sm leading-relaxed resize-y"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={saving} className="gap-2">
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  সংরক্ষণ করুন
+                </Button>
+                <button type="button" onClick={() => setEditing(null)} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  বাতিল
+                </button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }
 
@@ -1258,6 +1392,7 @@ const NAV = [
   { id: 'orders',      label: 'অর্ডারসমূহ',  Icon: ShoppingCart    },
   { id: 'products',    label: 'পণ্যসমূহ',    Icon: Package          },
   { id: 'categories',  label: 'ক্যাটাগরি',   Icon: LayoutGrid       },
+  { id: 'pages',       label: 'পেজসমূহ',     Icon: FileText         },
   { id: 'footer',      label: 'ফুটার',       Icon: LayoutTemplate  },
   { id: 'settings',    label: 'সেটিংস',     Icon: Settings         },
 ]
@@ -1278,6 +1413,7 @@ export default function Dashboard() {
     orders:     <OrdersTab />,
     products:   <ProductsTab />,
     categories: <CategoriesTab />,
+    pages:      <PagesTab />,
     footer:     <FooterTab />,
     settings:   <SettingsTab />,
   }

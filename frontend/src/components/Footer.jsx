@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { MapPin, Phone, Mail, Facebook, Twitter, Instagram } from 'lucide-react'
 import { api } from '@/lib/api'
 
@@ -12,9 +13,16 @@ const DEFAULTS = {
   footer_twitter:       '',
   footer_instagram:     '',
   footer_copyright:     'আমার শপ। সর্বস্বত্ব সংরক্ষিত।',
-  footer_links_info:    ['আমাদের সম্পর্কে','যোগাযোগ করুন','শর্তাবলী','গোপনীয়তা নীতি'],
-  footer_links_support: ['সাপোর্ট সেন্টার','অর্ডার ট্র্যাকিং','পেমেন্ট','সাধারণ জিজ্ঞাসা'],
-  footer_links_policy:  ['রিটার্ন পলিসি','রিফান্ড পলিসি','এক্সচেঞ্জ','বাতিল করা'],
+  footer_links_info:    [],
+  footer_links_support: [],
+  footer_links_policy:  [],
+}
+
+function normalizeLinks(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw.map(item =>
+    typeof item === 'string' ? { label: item, slug: '' } : item
+  )
 }
 
 export default function Footer() {
@@ -89,11 +97,20 @@ export default function Footer() {
             <div key={col.key}>
               <p className="mb-4 text-sm font-semibold text-foreground">{col.heading}</p>
               <ul className="flex flex-col gap-2.5">
-                {(Array.isArray(data[col.key]) ? data[col.key] : []).map((link, i) => (
+                {normalizeLinks(data[col.key]).map((link, i) => (
                   <li key={i}>
-                    <a href="#" className="text-xs text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:underline">
-                      {link}
-                    </a>
+                    {link.slug
+                      ? (
+                        <Link
+                          to={`/page/${link.slug}`}
+                          className="text-xs text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:underline"
+                        >
+                          {link.label}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{link.label}</span>
+                      )
+                    }
                   </li>
                 ))}
               </ul>
