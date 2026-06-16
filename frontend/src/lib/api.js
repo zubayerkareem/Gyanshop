@@ -68,4 +68,9 @@ export const api = {
   adminCreatePage: (body)       => request('/api/admin/pages', { method: 'POST', body: JSON.stringify(body) }),
   adminUpdatePage: (slug, body) => request(`/api/admin/pages?slug=${slug}`, { method: 'PUT', body: JSON.stringify(body) }),
   adminDeletePage: (slug)       => request(`/api/admin/pages?slug=${slug}`, { method: 'DELETE' }),
+
+  // Moderators admin
+  adminGetModerators:   ()     => request('/api/admin/moderators'),
+  adminCreateModerator: (body) => request('/api/admin/moderators', { method: 'POST', body: JSON.stringify(body) }),
+  adminDeleteModerator: (id)   => request(`/api/admin/moderators?id=${id}`, { method: 'DELETE' }),
 }

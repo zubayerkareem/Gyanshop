@@ -26,8 +26,8 @@ export default function AdminLogin() {
     setLoading(true)
 
     try {
-      const { token } = await api.login(form)
-      login(token)
+      const { token, role } = await api.login(form)
+      login(token, role)
       navigate('/admin/dashboard', { replace: true })
     } catch (err) {
       setError(err.message)

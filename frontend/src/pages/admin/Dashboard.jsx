@@ -25,7 +25,7 @@ import {
   ShoppingBag, Settings, Pencil, Upload, ImageIcon, LayoutTemplate,
   LayoutDashboard, ShoppingCart, TrendingUp, Users, DollarSign,
   Menu, X, ChevronRight, ArrowUpRight, Clock, LayoutGrid, FileText,
-  Download, Search, Phone, Mail, MapPin,
+  Download, Search, Phone, Mail, MapPin, UserCog, Shield, KeyRound,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -89,6 +89,7 @@ const REVENUE_DATA = [
 
 // ── Orders Tab ────────────────────────────────────────────
 function OrdersTab() {
+  const { isAdmin }                 = useAuth()
   const [orders, setOrders]         = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
@@ -192,7 +193,7 @@ function OrdersTab() {
           {selected.size > 0 && <span className="ml-2 font-semibold text-foreground">· {selected.size}টি নির্বাচিত</span>}
         </p>
         <div className="flex items-center gap-2">
-          {selected.size > 0 && (
+          {isAdmin && selected.size > 0 && (
             <Button
               variant="destructive" size="sm"
               disabled={bulkDeleting}
@@ -203,31 +204,33 @@ function OrdersTab() {
               {selected.size}টি মুছুন
             </Button>
           )}
-          <Button
-            variant="outline" size="sm"
-            className="gap-2"
-            onClick={() => downloadCsv(
-              orders.map(o => ({
-                ...o,
-                items: (o.items || []).map(i => `${i.product_name}×${i.quantity}`).join('; '),
-              })),
-              `orders-${new Date().toISOString().slice(0,10)}.csv`,
-              [
-                { key: 'id',              label: 'অর্ডার ID' },
-                { key: 'created_at',      label: 'তারিখ' },
-                { key: 'customer_name',   label: 'গ্রাহকের নাম' },
-                { key: 'customer_phone',  label: 'ফোন' },
-                { key: 'customer_email',  label: 'ইমেইল' },
-                { key: 'address',         label: 'ঠিকানা' },
-                { key: 'items',           label: 'পণ্যসমূহ' },
-                { key: 'total',           label: 'মোট (টাকা)' },
-                { key: 'status',          label: 'স্ট্যাটাস' },
-              ]
-            )}
-          >
-            <Download className="h-4 w-4" />
-            CSV
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="outline" size="sm"
+              className="gap-2"
+              onClick={() => downloadCsv(
+                orders.map(o => ({
+                  ...o,
+                  items: (o.items || []).map(i => `${i.product_name}×${i.quantity}`).join('; '),
+                })),
+                `orders-${new Date().toISOString().slice(0,10)}.csv`,
+                [
+                  { key: 'id',              label: 'অর্ডার ID' },
+                  { key: 'created_at',      label: 'তারিখ' },
+                  { key: 'customer_name',   label: 'গ্রাহকের নাম' },
+                  { key: 'customer_phone',  label: 'ফোন' },
+                  { key: 'customer_email',  label: 'ইমেইল' },
+                  { key: 'address',         label: 'ঠিকানা' },
+                  { key: 'items',           label: 'পণ্যসমূহ' },
+                  { key: 'total',           label: 'মোট (টাকা)' },
+                  { key: 'status',          label: 'স্ট্যাটাস' },
+                ]
+              )}
+            >
+              <Download className="h-4 w-4" />
+              CSV
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={fetchOrders}>রিফ্রেশ</Button>
         </div>
       </div>
@@ -304,14 +307,16 @@ function OrdersTab() {
                           ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
                           : <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         }
-                        <Button
-                          variant="ghost" size="icon"
-                          className="text-destructive hover:text-destructive"
-                          disabled={deleting === order.id}
-                          onClick={e => { e.stopPropagation(); setConfirmId(order.id) }}
-                        >
-                          {deleting === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost" size="icon"
+                            className="text-destructive hover:text-destructive"
+                            disabled={deleting === order.id}
+                            onClick={e => { e.stopPropagation(); setConfirmId(order.id) }}
+                          >
+                            {deleting === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -407,6 +412,7 @@ function ImageField({ value, onChange, uploading }) {
 
 // ── Products Tab ──────────────────────────────────────────
 function ProductsTab() {
+  const { isAdmin }                     = useAuth()
   const [products, setProducts]         = useState([])
   const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState(null)
@@ -565,8 +571,8 @@ function ProductsTab() {
     <>
       {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
 
-      {/* Add product form */}
-      <Card className="mb-6">
+      {/* Add product form — admin only */}
+      {isAdmin && <Card className="mb-6">
         <CardHeader><CardTitle className="text-base">নতুন পণ্য যোগ করুন</CardTitle></CardHeader>
         <CardContent>
           {addError && <Alert variant="destructive" className="mb-4"><AlertDescription>{addError}</AlertDescription></Alert>}
@@ -604,7 +610,7 @@ function ProductsTab() {
             </div>
           </form>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Product list toolbar */}
       <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
@@ -612,7 +618,7 @@ function ProductsTab() {
           মোট {products.length}টি পণ্য
           {selected.size > 0 && <span className="ml-2 font-semibold text-foreground">· {selected.size}টি নির্বাচিত</span>}
         </p>
-        {selected.size > 0 && (
+        {isAdmin && selected.size > 0 && (
           <Button variant="destructive" size="sm" disabled={bulkDeleting} onClick={() => setBulkConfirm(true)} className="gap-2">
             {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
             {selected.size}টি মুছুন
@@ -671,10 +677,12 @@ function ProductsTab() {
                       <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
-                        disabled={deleting === p.id} onClick={() => setConfirmId(p.id)}>
-                        {deleting === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      </Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
+                          disabled={deleting === p.id} onClick={() => setConfirmId(p.id)}>
+                          {deleting === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1736,6 +1744,7 @@ const CUSTOMER_CSV_COLS = [
 ]
 
 function CustomersTab() {
+  const { isAdmin }               = useAuth()
   const [customers, setCustomers] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
@@ -1772,19 +1781,21 @@ function CustomersTab() {
             {customers.length} জন গ্রাহক · মোট বিক্রয় {formatPrice(totalRevenue)}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => downloadCsv(
-            filtered.map(c => ({ ...c, total_spent: parseFloat(c.total_spent || 0).toFixed(2) })),
-            `customers-${new Date().toISOString().slice(0,10)}.csv`,
-            CUSTOMER_CSV_COLS
-          )}
-        >
-          <Download className="h-4 w-4" />
-          CSV এক্সপোর্ট {filtered.length !== customers.length && `(${filtered.length})`}
-        </Button>
+        {isAdmin && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => downloadCsv(
+              filtered.map(c => ({ ...c, total_spent: parseFloat(c.total_spent || 0).toFixed(2) })),
+              `customers-${new Date().toISOString().slice(0,10)}.csv`,
+              CUSTOMER_CSV_COLS
+            )}
+          >
+            <Download className="h-4 w-4" />
+            CSV এক্সপোর্ট {filtered.length !== customers.length && `(${filtered.length})`}
+          </Button>
+        )}
       </div>
 
       {/* KPI cards */}
@@ -1884,28 +1895,178 @@ function CustomersTab() {
   )
 }
 
+// ── Moderators Tab ────────────────────────────────────────
+function ModeratorsTab() {
+  const [mods, setMods]           = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [saving, setSaving]       = useState(false)
+  const [deleting, setDeleting]   = useState(null)
+  const [confirmId, setConfirmId] = useState(null)
+  const [error, setError]         = useState(null)
+  const [success, setSuccess]     = useState(false)
+  const [form, setForm]           = useState({ username: '', password: '' })
+
+  function fetchMods() {
+    setLoading(true); setError(null)
+    api.adminGetModerators()
+      .then(setMods)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { fetchMods() }, [])
+
+  async function handleAdd(e) {
+    e.preventDefault(); setSaving(true); setError(null)
+    try {
+      await api.adminCreateModerator(form)
+      setForm({ username: '', password: '' })
+      setSuccess(true); setTimeout(() => setSuccess(false), 3000)
+      fetchMods()
+    } catch (err) { setError(err.message) }
+    finally { setSaving(false) }
+  }
+
+  async function handleDelete() {
+    if (!confirmId) return
+    setDeleting(confirmId); setConfirmId(null)
+    try {
+      await api.adminDeleteModerator(confirmId)
+      setMods(prev => prev.filter(m => m.id !== confirmId))
+    } catch (err) { setError(err.message) }
+    finally { setDeleting(null) }
+  }
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
+
+  return (
+    <div className="space-y-6">
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {success && <Alert className="border-green-300 bg-green-50 text-green-800"><AlertDescription>মডারেটর যোগ হয়েছে!</AlertDescription></Alert>}
+
+      {/* Add moderator form */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base">নতুন মডারেটর যোগ করুন</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3 items-end">
+            <div className="space-y-1.5 flex-1">
+              <Label>ইউজারনেম</Label>
+              <Input
+                required value={form.username} placeholder="ইউজারনেম"
+                onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <Label>পাসওয়ার্ড <span className="text-muted-foreground font-normal text-xs">(কমপক্ষে ৬ অক্ষর)</span></Label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  required type="password" value={form.password} placeholder="পাসওয়ার্ড"
+                  className="pl-9"
+                  onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                />
+              </div>
+            </div>
+            <Button type="submit" disabled={saving} className="gap-2 shrink-0">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              যোগ করুন
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Moderator list */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">মডারেটর তালিকা ({mods.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {mods.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">কোনো মডারেটর নেই।</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ইউজারনেম</TableHead>
+                  <TableHead>রোল</TableHead>
+                  <TableHead>যোগ দেওয়ার তারিখ</TableHead>
+                  <TableHead className="text-right">অ্যাকশন</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mods.map(m => (
+                  <TableRow key={m.id}>
+                    <TableCell className="font-medium">{m.username}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold">
+                        <Shield className="h-3 w-3" /> মডারেটর
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(m.created_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost" size="icon"
+                        className="text-destructive hover:text-destructive"
+                        disabled={deleting === m.id}
+                        onClick={() => setConfirmId(m.id)}
+                      >
+                        {deleting === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!confirmId} onOpenChange={() => setConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>মডারেটর মুছবেন?</DialogTitle>
+            <DialogDescription>এই মডারেটরের অ্যাকাউন্ট মুছে ফেলা হবে। তারা আর লগইন করতে পারবেন না।</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">বাতিল</Button></DialogClose>
+            <Button variant="destructive" onClick={handleDelete}>হ্যাঁ, মুছুন</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 // ── Nav items config ──────────────────────────────────────
 const NAV = [
-  { id: 'overview',    label: 'ওভারভিউ',    Icon: LayoutDashboard },
+  { id: 'overview',    label: 'ওভারভিউ',     Icon: LayoutDashboard },
   { id: 'orders',      label: 'অর্ডারসমূহ',  Icon: ShoppingCart    },
   { id: 'customers',   label: 'গ্রাহকসমূহ',  Icon: Users            },
   { id: 'products',    label: 'পণ্যসমূহ',    Icon: Package          },
-  { id: 'categories',  label: 'ক্যাটাগরি',   Icon: LayoutGrid       },
-  { id: 'pages',       label: 'পেজসমূহ',     Icon: FileText         },
-  { id: 'footer',      label: 'ফুটার',       Icon: LayoutTemplate  },
-  { id: 'settings',    label: 'সেটিংস',     Icon: Settings         },
+  { id: 'categories',  label: 'ক্যাটাগরি',   Icon: LayoutGrid,       adminOnly: true },
+  { id: 'pages',       label: 'পেজসমূহ',     Icon: FileText,         adminOnly: true },
+  { id: 'footer',      label: 'ফুটার',       Icon: LayoutTemplate,  adminOnly: true },
+  { id: 'settings',    label: 'সেটিংস',     Icon: Settings,         adminOnly: true },
+  { id: 'moderators',  label: 'মডারেটর',     Icon: UserCog,          adminOnly: true },
 ]
 
 // ── Dashboard Shell ───────────────────────────────────────
 export default function Dashboard() {
-  const { logout } = useAuth()
+  const { logout, isAdmin, role } = useAuth()
   const navigate   = useNavigate()
   const [active, setActive]       = useState('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   function handleLogout() { logout(); navigate('/admin', { replace: true }) }
 
-  const currentNav = NAV.find(n => n.id === active)
+  const visibleNav = NAV.filter(n => isAdmin || !n.adminOnly)
+  const currentNav = visibleNav.find(n => n.id === active)
 
   const sections = {
     overview:   <OverviewSection />,
@@ -1916,6 +2077,7 @@ export default function Dashboard() {
     pages:      <PagesTab />,
     footer:     <FooterTab />,
     settings:   <SettingsTab />,
+    moderators: <ModeratorsTab />,
   }
 
   return (
@@ -1945,7 +2107,7 @@ export default function Dashboard() {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
           <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">মেনু</p>
-          {NAV.map(({ id, label, Icon }) => {
+          {visibleNav.map(({ id, label, Icon }) => {
             const isActive = active === id
             return (
               <button
@@ -1992,7 +2154,14 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">A</div>
+            <div className="hidden sm:flex items-center gap-2">
+              {!isAdmin && (
+                <span className="rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">মডারেটর</span>
+              )}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                {isAdmin ? 'A' : 'M'}
+              </div>
+            </div>
           </div>
         </header>
 
