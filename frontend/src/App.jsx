@@ -8,8 +8,10 @@ import Home from '@/pages/Home'
 import Product from '@/pages/Product'
 import Checkout from '@/pages/Checkout'
 import OrderSuccess from '@/pages/OrderSuccess'
+import { lazy, Suspense } from 'react'
+import { Loader2 } from 'lucide-react'
 import AdminLogin from '@/pages/admin/Login'
-import Dashboard from '@/pages/admin/Dashboard'
+const Dashboard = lazy(() => import('@/pages/admin/Dashboard'))
 
 function PublicLayout({ children }) {
   return (
@@ -39,7 +41,9 @@ export default function App() {
               path="/admin/dashboard"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                    <Dashboard />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />

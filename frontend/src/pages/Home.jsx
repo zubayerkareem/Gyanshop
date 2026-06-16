@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import ProductCard from '@/components/ProductCard'
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react'
 
 // ── Coverflow Slider ──────────────────────────────────────
 const SLIDES = [
@@ -110,16 +110,6 @@ function CoverflowSlider() {
   )
 }
 
-// ── Categories ────────────────────────────────────────────
-const CATEGORIES = [
-  { label: 'শার্ট',      icon: '👔' },
-  { label: 'পাঞ্জাবি',  icon: '🥻' },
-  { label: 'প্যান্ট',   icon: '👖' },
-  { label: 'জ্যাকেট',  icon: '🧥' },
-  { label: 'টি-শার্ট',  icon: '👕' },
-  { label: 'অ্যাক্সেসরি', icon: '🧣' },
-]
-
 // ── Blog posts (static) ───────────────────────────────────
 const BLOG_POSTS = [
   {
@@ -152,13 +142,14 @@ const BLOG_POSTS = [
 ]
 
 export default function Home() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState(null)
+  const [products, setProducts]     = useState([])
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
 
   useEffect(() => {
-    api.getProducts()
-      .then(setProducts)
+    Promise.all([api.getProducts(), api.getCategories()])
+      .then(([prods, cats]) => { setProducts(prods); setCategories(cats) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -168,25 +159,34 @@ export default function Home() {
 
       <CoverflowSlider />
 
-      {/* Category section */}
-      <section className="py-8">
-        <div className="mb-6 flex items-center gap-4">
-          <div className="h-px flex-1 bg-border" />
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">ক্যাটাগরি</h2>
-          <div className="h-px flex-1 bg-border" />
-        </div>
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.label}
-              className="group flex flex-col items-center gap-2 rounded-[6px] border border-border bg-card p-4 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="text-2xl">{cat.icon}</span>
-              <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{cat.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* Category section — dynamic */}
+      {categories.length > 0 && (
+        <section className="py-8">
+          <div className="mb-6 flex items-center gap-4">
+            <div className="h-px flex-1 bg-border" />
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">ক্যাটাগরি</h2>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <div className={`grid gap-3 ${categories.length <= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-6'}`}>
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                className="group flex flex-col items-center gap-2.5 rounded-xl border border-border bg-card p-3 transition-all hover:border-primary hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <div className="h-14 w-14 overflow-hidden rounded-lg bg-muted border border-border group-hover:border-primary/30 transition-colors">
+                  {cat.image_url
+                    ? <img src={cat.image_url} alt={cat.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    : <div className="flex h-full items-center justify-center">
+                        <LayoutGrid className="h-6 w-6 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                      </div>
+                  }
+                </div>
+                <span className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors leading-tight text-center">{cat.name}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Divider */}
       <div className="mb-8 flex items-center gap-4">

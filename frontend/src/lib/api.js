@@ -28,8 +28,9 @@ export const api = {
 
   // ── Admin ───────────────────────────────────────────────
   login:         (body)   => request('/api/admin/login',    { method: 'POST', body: JSON.stringify(body) }),
-  getOrders:     ()       => request('/api/admin/orders'),
-  deleteOrder:   (id)     => request(`/api/admin/orders?id=${id}`, { method: 'DELETE' }),
+  getOrders:         ()           => request('/api/admin/orders'),
+  deleteOrder:       (id)         => request(`/api/admin/orders?id=${id}`, { method: 'DELETE' }),
+  updateOrderStatus: (id, status) => request(`/api/admin/orders?id=${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   addProduct:    (body)   => request('/api/admin/products', { method: 'POST', body: JSON.stringify(body) }),
   updateProduct: (id, body) => request(`/api/admin/products?id=${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteProduct: (id)     => request(`/api/admin/products?id=${id}`, { method: 'DELETE' }),
@@ -46,6 +47,16 @@ export const api = {
       return r.json()
     })
   },
-  getSettings:   ()       => request('/api/admin/settings'),
-  saveSettings:  (body)   => request('/api/admin/settings', { method: 'POST', body: JSON.stringify(body) }),
+  getSettings:    ()       => request('/api/admin/settings'),
+  saveSettings:   (body)   => request('/api/admin/settings', { method: 'POST', body: JSON.stringify(body) }),
+  getFooterAdmin: ()       => request('/api/admin/settings'),
+  saveFooter:     (body)   => request('/api/admin/settings', { method: 'POST', body: JSON.stringify(body) }),
+  getFooter:      ()       => fetch(`${BASE}/api/public/footer`, { cache: 'no-store' }).then(r => r.json()),
+  getCategories:  ()       => fetch(`${BASE}/api/public/categories`).then(r => r.json()),
+
+  // Categories admin
+  adminGetCategories:    ()         => request('/api/admin/categories'),
+  adminAddCategory:      (body)     => request('/api/admin/categories', { method: 'POST', body: JSON.stringify(body) }),
+  adminUpdateCategory:   (id, body) => request(`/api/admin/categories?id=${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  adminDeleteCategory:   (id)       => request(`/api/admin/categories?id=${id}`, { method: 'DELETE' }),
 }
