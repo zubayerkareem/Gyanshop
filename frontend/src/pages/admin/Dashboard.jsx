@@ -25,11 +25,29 @@ import {
   ShoppingBag, Settings, Pencil, Upload, ImageIcon, LayoutTemplate,
   LayoutDashboard, ShoppingCart, TrendingUp, Users, DollarSign,
   Menu, X, ChevronRight, ArrowUpRight, Clock, LayoutGrid, FileText,
+  Download, Search, Phone, Mail, MapPin,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts'
+
+// ── CSV export utility ────────────────────────────────────
+function downloadCsv(rows, filename, cols) {
+  const header = cols.map(c => `"${c.label}"`).join(',')
+  const body   = rows.map(row =>
+    cols.map(c => {
+      const v = (row[c.key] ?? '').toString().replace(/"/g, '""')
+      return `"${v}"`
+    }).join(',')
+  )
+  const csv  = '﻿' + [header, ...body].join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ── Mock chart data ───────────────────────────────────────
 const REVENUE_DATA = [
@@ -148,6 +166,31 @@ function OrdersTab() {
               {selected.size}টি মুছুন
             </Button>
           )}
+          <Button
+            variant="outline" size="sm"
+            className="gap-2"
+            onClick={() => downloadCsv(
+              orders.map(o => ({
+                ...o,
+                items: (o.items || []).map(i => `${i.product_name}×${i.quantity}`).join('; '),
+              })),
+              `orders-${new Date().toISOString().slice(0,10)}.csv`,
+              [
+                { key: 'id',              label: 'অর্ডার ID' },
+                { key: 'created_at',      label: 'তারিখ' },
+                { key: 'customer_name',   label: 'গ্রাহকের নাম' },
+                { key: 'customer_phone',  label: 'ফোন' },
+                { key: 'customer_email',  label: 'ইমেইল' },
+                { key: 'address',         label: 'ঠিকানা' },
+                { key: 'items',           label: 'পণ্যসমূহ' },
+                { key: 'total',           label: 'মোট (টাকা)' },
+                { key: 'status',          label: 'স্ট্যাটাস' },
+              ]
+            )}
+          >
+            <Download className="h-4 w-4" />
+            CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={fetchOrders}>রিফ্রেশ</Button>
         </div>
       </div>
@@ -1549,10 +1592,172 @@ function OverviewSection() {
   )
 }
 
+// ── Customers Tab ─────────────────────────────────────────
+const CUSTOMER_CSV_COLS = [
+  { key: 'customer_name',  label: 'নাম' },
+  { key: 'customer_phone', label: 'ফোন' },
+  { key: 'customer_email', label: 'ইমেইল' },
+  { key: 'address',        label: 'ঠিকানা' },
+  { key: 'order_count',    label: 'অর্ডার সংখ্যা' },
+  { key: 'total_spent',    label: 'মোট কেনাকাটা (টাকা)' },
+  { key: 'first_order_at', label: 'প্রথম অর্ডার' },
+  { key: 'last_order_at',  label: 'শেষ অর্ডার' },
+]
+
+function CustomersTab() {
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState(null)
+  const [query, setQuery]         = useState('')
+
+  useEffect(() => {
+    api.adminGetCustomers()
+      .then(setCustomers)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const filtered = query.trim()
+    ? customers.filter(c =>
+        c.customer_name?.toLowerCase().includes(query.toLowerCase()) ||
+        c.customer_phone?.includes(query) ||
+        c.customer_email?.toLowerCase().includes(query.toLowerCase())
+      )
+    : customers
+
+  const totalRevenue = customers.reduce((s, c) => s + parseFloat(c.total_spent || 0), 0)
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
+
+  return (
+    <div className="space-y-5">
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">গ্রাহকসমূহ</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {customers.length} জন গ্রাহক · মোট বিক্রয় {formatPrice(totalRevenue)}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => downloadCsv(
+            filtered.map(c => ({ ...c, total_spent: parseFloat(c.total_spent || 0).toFixed(2) })),
+            `customers-${new Date().toISOString().slice(0,10)}.csv`,
+            CUSTOMER_CSV_COLS
+          )}
+        >
+          <Download className="h-4 w-4" />
+          CSV এক্সপোর্ট {filtered.length !== customers.length && `(${filtered.length})`}
+        </Button>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { label: 'মোট গ্রাহক',    value: customers.length,                                icon: Users,         color: 'text-blue-600'  },
+          { label: 'মোট অর্ডার',    value: customers.reduce((s,c) => s + parseInt(c.order_count), 0), icon: ShoppingCart, color: 'text-violet-600' },
+          { label: 'মোট বিক্রয়',   value: formatPrice(totalRevenue),                       icon: DollarSign,    color: 'text-green-600'  },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted ${color}`}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-xl font-bold text-foreground">{value}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="নাম, ফোন বা ইমেইল দিয়ে খুঁজুন..."
+          className="w-full rounded-md border border-border bg-background pl-9 pr-4 py-2 text-sm outline-none focus:border-primary transition-colors"
+        />
+      </div>
+
+      {/* Table */}
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="text-xs font-semibold">নাম</TableHead>
+                <TableHead className="text-xs font-semibold">ফোন</TableHead>
+                <TableHead className="text-xs font-semibold hidden md:table-cell">ইমেইল</TableHead>
+                <TableHead className="text-xs font-semibold hidden lg:table-cell">ঠিকানা</TableHead>
+                <TableHead className="text-xs font-semibold text-center">অর্ডার</TableHead>
+                <TableHead className="text-xs font-semibold text-right">মোট কেনাকাটা</TableHead>
+                <TableHead className="text-xs font-semibold hidden sm:table-cell">শেষ অর্ডার</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                    কোনো গ্রাহক পাওয়া যায়নি।
+                  </TableCell>
+                </TableRow>
+              )}
+              {filtered.map((c, i) => (
+                <TableRow key={i} className="hover:bg-muted/20 transition-colors">
+                  <TableCell className="font-medium text-sm">{c.customer_name}</TableCell>
+                  <TableCell>
+                    <a href={`tel:${c.customer_phone}`} className="flex items-center gap-1.5 text-sm text-primary hover:underline">
+                      <Phone className="h-3 w-3 shrink-0" />
+                      {c.customer_phone}
+                    </a>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
+                    {c.customer_email
+                      ? <a href={`mailto:${c.customer_email}`} className="flex items-center gap-1 hover:text-primary transition-colors"><Mail className="h-3 w-3" />{c.customer_email}</a>
+                      : <span className="text-muted-foreground/40">—</span>
+                    }
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground hidden lg:table-cell max-w-[180px]">
+                    <span className="flex items-start gap-1 truncate" title={c.address}>
+                      <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
+                      <span className="truncate">{c.address}</span>
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="inline-flex items-center justify-center h-6 min-w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold px-2">
+                      {c.order_count}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium">
+                    {formatPrice(parseFloat(c.total_spent || 0))}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
+                    {formatDate(c.last_order_at)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 // ── Nav items config ──────────────────────────────────────
 const NAV = [
   { id: 'overview',    label: 'ওভারভিউ',    Icon: LayoutDashboard },
   { id: 'orders',      label: 'অর্ডারসমূহ',  Icon: ShoppingCart    },
+  { id: 'customers',   label: 'গ্রাহকসমূহ',  Icon: Users            },
   { id: 'products',    label: 'পণ্যসমূহ',    Icon: Package          },
   { id: 'categories',  label: 'ক্যাটাগরি',   Icon: LayoutGrid       },
   { id: 'pages',       label: 'পেজসমূহ',     Icon: FileText         },
@@ -1574,6 +1779,7 @@ export default function Dashboard() {
   const sections = {
     overview:   <OverviewSection />,
     orders:     <OrdersTab />,
+    customers:  <CustomersTab />,
     products:   <ProductsTab />,
     categories: <CategoriesTab />,
     pages:      <PagesTab />,
