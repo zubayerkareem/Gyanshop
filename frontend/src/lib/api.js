@@ -62,5 +62,7 @@ export const api = {
 
   // Pages admin
   adminGetPages:   ()           => request('/api/admin/pages'),
+  adminCreatePage: (body)       => request('/api/admin/pages', { method: 'POST', body: JSON.stringify(body) }),
   adminUpdatePage: (slug, body) => request(`/api/admin/pages?slug=${slug}`, { method: 'PUT', body: JSON.stringify(body) }),
+  adminDeletePage: (slug)       => request(`/api/admin/pages?slug=${slug}`, { method: 'DELETE' }),
 }

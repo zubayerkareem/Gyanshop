@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import RichEditor from '@/components/RichEditor'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
@@ -959,29 +960,53 @@ function FooterTab() {
 }
 
 // ── Pages Tab ─────────────────────────────────────────────
-function PagesTab() {
-  const [pages, setPages]     = useState([])
-  const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(null)
-  const [saving, setSaving]   = useState(false)
-  const [error, setError]     = useState(null)
-  const [success, setSuccess] = useState(false)
+const EMPTY_PAGE = { slug: '', title: '', content: '' }
 
-  useEffect(() => {
+function PagesTab() {
+  const [pages, setPages]       = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [mode, setMode]         = useState('list') // 'list' | 'edit' | 'create'
+  const [current, setCurrent]   = useState(EMPTY_PAGE)
+  const [saving, setSaving]     = useState(false)
+  const [deleting, setDeleting] = useState(null)
+  const [error, setError]       = useState(null)
+  const [success, setSuccess]   = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
+
+  const fetchPages = useCallback(() => {
+    setLoading(true)
     api.adminGetPages()
       .then(setPages)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => { fetchPages() }, [fetchPages])
+
+  function openEdit(page) {
+    setCurrent({ ...page }); setMode('edit'); setError(null); setSuccess(false)
+  }
+  function openCreate() {
+    setCurrent(EMPTY_PAGE); setMode('create'); setError(null); setSuccess(false)
+  }
+  function backToList() {
+    setMode('list'); setCurrent(EMPTY_PAGE); setSuccess(false); setError(null)
+  }
+
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true); setError(null); setSuccess(false)
     try {
-      await api.adminUpdatePage(editing.slug, { title: editing.title, content: editing.content })
-      setPages(prev => prev.map(p => p.slug === editing.slug ? { ...p, title: editing.title, content: editing.content } : p))
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      if (mode === 'create') {
+        await api.adminCreatePage(current)
+        fetchPages()
+        setMode('list')
+      } else {
+        await api.adminUpdatePage(current.slug, { title: current.title, content: current.content })
+        setPages(prev => prev.map(p => p.slug === current.slug ? { ...p, ...current } : p))
+        setSuccess(true)
+        setTimeout(() => setSuccess(false), 3000)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -989,67 +1014,205 @@ function PagesTab() {
     }
   }
 
+  async function handleDelete(slug) {
+    setDeleting(slug)
+    try {
+      await api.adminDeletePage(slug)
+      setPages(prev => prev.filter(p => p.slug !== slug))
+      if (mode !== 'list') backToList()
+    } catch (err) { setError(err.message) }
+    finally { setDeleting(null); setConfirmDel(null) }
+  }
+
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
 
-  return (
-    <div className="space-y-6">
-      {error   && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-      {success && <Alert className="border-green-200 bg-green-50 text-green-800"><AlertDescription>পেজ সফলভাবে সংরক্ষিত হয়েছে।</AlertDescription></Alert>}
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {pages.map(page => (
+  /* ── Editor view (edit or create) ── */
+  if (mode === 'edit' || mode === 'create') {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
           <button
-            key={page.slug}
-            onClick={() => { setEditing({ ...page }); setSuccess(false); setError(null) }}
-            className={`text-left rounded-lg border p-4 transition-all hover:border-primary hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${editing?.slug === page.slug ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+            type="button"
+            onClick={backToList}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            <p className="text-xs font-mono text-muted-foreground mb-1">{page.slug}</p>
-            <p className="text-sm font-semibold text-foreground leading-snug">{page.title}</p>
+            <ChevronRight className="h-4 w-4 rotate-180" />
+            সকল পেজ
           </button>
-        ))}
-      </div>
+          {mode === 'edit' && (
+            <button
+              type="button"
+              onClick={() => setConfirmDel(current.slug)}
+              className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              পেজ মুছুন
+            </button>
+          )}
+        </div>
 
-      {editing && (
+        {error   && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+        {success && <Alert className="border-green-200 bg-green-50 text-green-800"><AlertDescription>পেজ সংরক্ষিত হয়েছে।</AlertDescription></Alert>}
+
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{editing.title} সম্পাদনা</CardTitle>
-              <code className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground">/page/{editing.slug}</code>
-            </div>
+            <CardTitle className="text-base">
+              {mode === 'create' ? 'নতুন পেজ তৈরি করুন' : `সম্পাদনা — ${current.title}`}
+            </CardTitle>
+            {mode === 'edit' && (
+              <code className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground w-fit">/page/{current.slug}</code>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSave} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>পেজ শিরোনাম</Label>
-                <Input
-                  value={editing.title}
-                  onChange={e => setEditing(prev => ({ ...prev, title: e.target.value }))}
-                  required
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>পেজ শিরোনাম *</Label>
+                  <Input
+                    required
+                    value={current.title}
+                    onChange={e => setCurrent(p => ({ ...p, title: e.target.value }))}
+                    placeholder="যেমন: আমাদের সম্পর্কে"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>
+                    স্লাগ (URL) *
+                    {mode === 'edit' && <span className="ml-1 text-xs text-muted-foreground">(পরিবর্তন করা যাবে না)</span>}
+                  </Label>
+                  <Input
+                    required
+                    readOnly={mode === 'edit'}
+                    value={current.slug}
+                    onChange={e => setCurrent(p => ({ ...p, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))}
+                    placeholder="যেমন: about"
+                    className={`font-mono text-sm ${mode === 'edit' ? 'bg-muted text-muted-foreground' : ''}`}
+                  />
+                </div>
               </div>
+
               <div className="space-y-1.5">
                 <Label>পেজের বিষয়বস্তু</Label>
-                <Textarea
-                  rows={12}
-                  value={editing.content || ''}
-                  onChange={e => setEditing(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="পেজের কন্টেন্ট লিখুন..."
-                  className="font-sans text-sm leading-relaxed resize-y"
+                <RichEditor
+                  key={current.slug + '-' + mode}
+                  content={current.content || ''}
+                  onChange={html => setCurrent(p => ({ ...p, content: html }))}
                 />
               </div>
-              <div className="flex items-center gap-3">
+
+              <div className="flex items-center gap-3 pt-1">
                 <Button type="submit" disabled={saving} className="gap-2">
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  সংরক্ষণ করুন
+                  {mode === 'create' ? 'পেজ তৈরি করুন' : 'সংরক্ষণ করুন'}
                 </Button>
-                <button type="button" onClick={() => setEditing(null)} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <button type="button" onClick={backToList} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   বাতিল
                 </button>
               </div>
             </form>
           </CardContent>
         </Card>
-      )}
+
+        {/* Delete confirmation dialog */}
+        <Dialog open={!!confirmDel} onOpenChange={() => setConfirmDel(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>পেজ মুছবেন?</DialogTitle>
+              <DialogDescription>
+                <code className="bg-muted px-1.5 py-0.5 rounded text-sm">{confirmDel}</code> পেজটি স্থায়ীভাবে মুছে যাবে। এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline" size="sm">বাতিল</Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={!!deleting}
+                onClick={() => handleDelete(confirmDel)}
+                className="gap-2"
+              >
+                {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                মুছুন
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+  }
+
+  /* ── List view ── */
+  return (
+    <div className="space-y-5">
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">পেজসমূহ</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{pages.length}টি পেজ</p>
+        </div>
+        <Button onClick={openCreate} className="gap-2" size="sm">
+          <Plus className="h-4 w-4" />
+          নতুন পেজ
+        </Button>
+      </div>
+
+      <Card>
+        <div className="divide-y divide-border">
+          {pages.length === 0 && (
+            <p className="py-10 text-center text-sm text-muted-foreground">কোনো পেজ নেই।</p>
+          )}
+          {pages.map(page => (
+            <div key={page.slug} className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30 transition-colors">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{page.title}</p>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">/page/{page.slug}</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1.5" onClick={() => openEdit(page)}>
+                  <Pencil className="h-3 w-3" />
+                  সম্পাদনা
+                </Button>
+                <button
+                  onClick={() => setConfirmDel(page.slug)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!confirmDel} onOpenChange={() => setConfirmDel(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>পেজ মুছবেন?</DialogTitle>
+            <DialogDescription>
+              <code className="bg-muted px-1.5 py-0.5 rounded text-sm">{confirmDel}</code> পেজটি স্থায়ীভাবে মুছে যাবে।
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" size="sm">বাতিল</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={!!deleting}
+              onClick={() => handleDelete(confirmDel)}
+              className="gap-2"
+            >
+              {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              মুছুন
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
