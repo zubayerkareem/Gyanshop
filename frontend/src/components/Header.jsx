@@ -7,6 +7,7 @@ import { formatPrice } from '@/lib/utils'
 
 const NAV_LINKS = [
   { to: '/',     label: 'হোম' },
+  { to: '/shop', label: 'শপ' },
   { to: '/blog', label: 'ব্লগ' },
 ]
 

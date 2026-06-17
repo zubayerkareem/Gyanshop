@@ -83,4 +83,13 @@ export const api = {
   adminCreateBlogPost:(body)    => request('/api/admin/blog', { method: 'POST', body: JSON.stringify(body) }),
   adminUpdateBlogPost:(id, body)=> request(`/api/admin/blog?id=${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   adminDeleteBlogPost:(id)      => request(`/api/admin/blog?id=${id}`, { method: 'DELETE' }),
+
+  // Sliders — public
+  getSliders: () => fetch(`${BASE}/api/public/sliders`).then(r => r.json()),
+
+  // Sliders — admin
+  adminGetSliders:    ()         => request('/api/admin/sliders'),
+  adminAddSlider:     (body)     => request('/api/admin/sliders', { method: 'POST', body: JSON.stringify(body) }),
+  adminUpdateSlider:  (id, body) => request(`/api/admin/sliders?id=${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  adminDeleteSlider:  (id)       => request(`/api/admin/sliders?id=${id}`, { method: 'DELETE' }),
 }

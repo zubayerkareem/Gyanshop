@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import RichEditor from '@/components/RichEditor'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
@@ -26,6 +26,7 @@ import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users, DollarSign,
   Menu, X, ChevronRight, ArrowUpRight, Clock, LayoutGrid, FileText,
   Download, Search, Phone, Mail, MapPin, UserCog, Shield, KeyRound, Newspaper, Eye, EyeOff,
+  SlidersHorizontal, Play, Link2, MoveUp, MoveDown,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -432,7 +433,9 @@ function ProductsTab() {
   const [page, setPage]                 = useState(1)
   const [pageSize, setPageSize]         = useState(20)
 
-  const emptyForm = { name: '', description: '', price: '', image_url: '', video_url: '', stock: '', cross_sell_ids: '', review_type: 'text', review_images: [] }
+  const [categories, setCategories] = useState([])
+
+  const emptyForm = { name: '', description: '', price: '', image_url: '', video_url: '', stock: '', category_id: '', cross_sell_ids: '', review_type: 'text', review_images: [] }
   const [form, setForm]         = useState(emptyForm)
   const [editForm, setEditForm] = useState(emptyForm)
 
@@ -445,6 +448,10 @@ function ProductsTab() {
   }, [])
 
   useEffect(() => { fetchProducts() }, [fetchProducts])
+
+  useEffect(() => {
+    api.adminGetCategories().then(setCategories).catch(() => {})
+  }, [])
 
   function handleFormChange(e) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -493,6 +500,7 @@ function ProductsTab() {
       image_url:      product.image_url || '',
       video_url:      product.video_url || '',
       stock:          product.stock,
+      category_id:    product.category_id || '',
       cross_sell_ids: product.cross_sell_ids || '',
       review_type:    product.review_type || 'text',
       review_images:  Array.isArray(reviewImages) ? reviewImages : [],
@@ -590,6 +598,14 @@ function ProductsTab() {
               <Input name="stock" type="number" min="0" value={form.stock} onChange={handleFormChange} placeholder="0" />
             </div>
             <div className="space-y-1.5">
+              <Label>ক্যাটাগরি</Label>
+              <select name="category_id" value={form.category_id} onChange={handleFormChange}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                <option value="">— ক্যাটাগরি নেই —</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
               <Label>পণ্যের ছবি</Label>
               <ImageField value={form.image_url} uploading={uploadingAdd}
                 onChange={file => handleImageUpload(file, false)} />
@@ -645,6 +661,7 @@ function ProductsTab() {
                 </TableHead>
                 <TableHead className="w-16">ছবি</TableHead>
                 <TableHead>নাম</TableHead>
+                <TableHead className="hidden sm:table-cell">ক্যাটাগরি</TableHead>
                 <TableHead>মূল্য</TableHead>
                 <TableHead>স্টক</TableHead>
                 <TableHead className="text-right">অ্যাকশন</TableHead>
@@ -668,6 +685,7 @@ function ProductsTab() {
                     }
                   </TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">{p.category_name || '—'}</TableCell>
                   <TableCell>{formatPrice(p.price)}</TableCell>
                   <TableCell>
                     <Badge variant={p.stock > 0 ? 'default' : 'destructive'}>{p.stock}</Badge>
@@ -715,6 +733,14 @@ function ProductsTab() {
             <div className="space-y-1.5">
               <Label>স্টক পরিমাণ</Label>
               <Input name="stock" type="number" min="0" value={editForm.stock} onChange={handleEditFormChange} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ক্যাটাগরি</Label>
+              <select name="category_id" value={editForm.category_id} onChange={handleEditFormChange}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                <option value="">— ক্যাটাগরি নেই —</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label>পণ্যের ছবি</Label>
@@ -2327,6 +2353,195 @@ function ModeratorsTab() {
   )
 }
 
+// ── Sliders Tab ───────────────────────────────────────────
+function SlidersTab() {
+  const [slides, setSlides]         = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState(null)
+  const [showForm, setShowForm]     = useState(false)
+  const [imageFile, setImageFile]   = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const [videoUrl, setVideoUrl]     = useState('')
+  const [uploading, setUploading]   = useState(false)
+  const [confirmId, setConfirmId]   = useState(null)
+  const fileRef = useRef(null)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.adminGetSliders()
+      .then(setSlides)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  function handleFileChange(e) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setImageFile(f)
+    setImagePreview(URL.createObjectURL(f))
+  }
+
+  async function handleAdd(e) {
+    e.preventDefault()
+    if (!imageFile) return
+    setSaving(true); setUploading(true)
+    try {
+      const { url } = await api.uploadImage(imageFile)
+      setUploading(false)
+      const newSlide = await api.adminAddSlider({ image_url: url, video_url: videoUrl.trim() || null })
+      setSlides(prev => [...prev, newSlide])
+      setShowForm(false); setImageFile(null); setImagePreview(null); setVideoUrl('')
+      if (fileRef.current) fileRef.current.value = ''
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false); setUploading(false) }
+  }
+
+  async function handleMove(id, direction) {
+    try {
+      const updated = await api.adminUpdateSlider(id, { direction })
+      if (Array.isArray(updated)) setSlides(updated)
+    } catch (e) { setError(e.message) }
+  }
+
+  async function handleDelete() {
+    if (!confirmId) return
+    try {
+      await api.adminDeleteSlider(confirmId)
+      setSlides(prev => prev.filter(s => s.id !== confirmId))
+      setConfirmId(null)
+    } catch (e) { setError(e.message) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between py-4">
+          <CardTitle className="text-base">স্লাইডার ম্যানেজমেন্ট</CardTitle>
+          <Button size="sm" onClick={() => { setShowForm(f => !f); setImageFile(null); setImagePreview(null); setVideoUrl('') }}>
+            <Plus className="h-4 w-4 mr-1.5" />নতুন স্লাইড
+          </Button>
+        </CardHeader>
+
+        {showForm && (
+          <div className="border-t border-border px-6 py-5">
+            <form onSubmit={handleAdd} className="space-y-4 max-w-lg">
+              <div className="space-y-1.5">
+                <Label>স্লাইড ছবি <span className="text-destructive">*</span></Label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  className="flex h-40 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary transition-colors overflow-hidden bg-muted/30"
+                >
+                  {imagePreview
+                    ? <img src={imagePreview} alt="preview" className="h-full w-full object-cover" />
+                    : <><Upload className="h-7 w-7 text-muted-foreground mb-2" /><span className="text-xs text-muted-foreground">ছবি আপলোড করুন (JPG, PNG, WebP)</span></>
+                  }
+                </div>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5">
+                  <Link2 className="h-3.5 w-3.5" />YouTube ভিডিও লিংক (ঐচ্ছিক)
+                </Label>
+                <Input
+                  value={videoUrl}
+                  onChange={e => setVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="font-mono text-xs"
+                />
+                <p className="text-[11px] text-muted-foreground">লিংক দিলে ছবির উপর প্লে বাটন দেখাবে</p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button type="submit" disabled={!imageFile || saving} size="sm">
+                  {uploading ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />আপলোড হচ্ছে...</> : saving ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />সংরক্ষণ...</> : 'স্লাইড যোগ করুন'}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowForm(false)}>বাতিল</Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        <CardContent className="p-0">
+          {error && <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert>}
+          {loading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}
+
+          {!loading && slides.length === 0 && (
+            <div className="py-16 text-center text-sm text-muted-foreground">
+              কোনো স্লাইড নেই। "নতুন স্লাইড" বাটন দিয়ে যোগ করুন।
+            </div>
+          )}
+
+          {!loading && slides.length > 0 && (
+            <div className="divide-y divide-border">
+              {slides.map((slide, idx) => (
+                <div key={slide.id} className="flex items-center gap-4 px-4 py-3">
+                  {/* Thumbnail */}
+                  <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                    <img src={slide.image_url} alt={`স্লাইড ${idx + 1}`} className="h-full w-full object-cover" />
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">স্লাইড {idx + 1}</p>
+                    {slide.video_url
+                      ? <p className="flex items-center gap-1 text-xs text-primary mt-0.5 truncate"><Play className="h-3 w-3 shrink-0" />{slide.video_url}</p>
+                      : <p className="text-xs text-muted-foreground mt-0.5">ভিডিও নেই</p>
+                    }
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleMove(slide.id, 'up')}
+                      disabled={idx === 0}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="উপরে সরান"
+                    >
+                      <MoveUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleMove(slide.id, 'down')}
+                      disabled={idx === slides.length - 1}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="নিচে সরান"
+                    >
+                      <MoveDown className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setConfirmId(slide.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
+                      title="মুছুন"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!confirmId} onOpenChange={() => setConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>স্লাইড মুছবেন?</DialogTitle>
+            <DialogDescription>এই স্লাইডটি হোমপেজ থেকে মুছে ফেলা হবে।</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">বাতিল</Button></DialogClose>
+            <Button variant="destructive" onClick={handleDelete}>হ্যাঁ, মুছুন</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 // ── Nav items config ──────────────────────────────────────
 const NAV = [
   { id: 'overview',    label: 'ওভারভিউ',     Icon: LayoutDashboard },
@@ -2335,6 +2550,7 @@ const NAV = [
   { id: 'products',    label: 'পণ্যসমূহ',    Icon: Package          },
   { id: 'categories',  label: 'ক্যাটাগরি',   Icon: LayoutGrid,       adminOnly: true },
   { id: 'pages',       label: 'পেজসমূহ',     Icon: FileText,         adminOnly: true },
+  { id: 'sliders',     label: 'স্লাইডার',    Icon: SlidersHorizontal, adminOnly: true },
   { id: 'blog',        label: 'ব্লগ পোস্ট',  Icon: Newspaper,        adminOnly: true },
   { id: 'footer',      label: 'ফুটার',       Icon: LayoutTemplate,  adminOnly: true },
   { id: 'settings',    label: 'সেটিংস',     Icon: Settings,         adminOnly: true },
@@ -2359,6 +2575,7 @@ export default function Dashboard() {
     customers:  <CustomersTab />,
     products:   <ProductsTab />,
     categories: <CategoriesTab />,
+    sliders:    <SlidersTab />,
     pages:      <PagesTab />,
     blog:       <BlogTab />,
     footer:     <FooterTab />,

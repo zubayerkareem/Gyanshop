@@ -2,18 +2,16 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import ProductCard from '@/components/ProductCard'
-import { Loader2, ChevronLeft, ChevronRight, LayoutGrid, X } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, LayoutGrid, X, Play } from 'lucide-react'
+
+// ── YouTube helper ────────────────────────────────────────
+function getYouTubeId(url) {
+  if (!url) return null
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([^&\s?/]+)/)
+  return m ? m[1] : null
+}
 
 // ── Coverflow Slider ──────────────────────────────────────
-const SLIDES = [
-  { bg: 'from-rose-400 via-pink-500 to-purple-600',     label: 'নতুন কালেকশন',     sub: 'এই মৌসুমের সেরা পোশাক' },
-  { bg: 'from-amber-400 via-orange-500 to-red-500',     label: 'ঈদ স্পেশাল',       sub: 'বিশেষ ছাড়ে পাচ্ছেন' },
-  { bg: 'from-sky-400 via-blue-500 to-indigo-600',      label: 'সামার সেল',         sub: 'গ্রীষ্মকালীন অফার' },
-  { bg: 'from-violet-500 via-purple-500 to-fuchsia-600',label: 'বেস্টসেলার',        sub: 'সবচেয়ে বেশি বিক্রিত' },
-  { bg: 'from-emerald-400 via-teal-500 to-cyan-600',    label: 'নতুন আরাইভাল',     sub: 'একদম নতুন পণ্য' },
-  { bg: 'from-pink-400 via-rose-500 to-orange-400',     label: 'এক্সক্লুসিভ অফার', sub: 'সীমিত সময়ের ডিল' },
-]
-
 const CFG_DESK = {
   '-2': { x: -430, scale: 0.52, opacity: 0.40, z: 1 },
   '-1': { x: -240, scale: 0.74, opacity: 0.72, z: 5 },
@@ -27,11 +25,12 @@ const CFG_MOB = {
    '1': { x:  155, scale: 0.70, opacity: 0.65, z: 5 },
 }
 
-function CoverflowSlider() {
-  const [active, setActive] = useState(0)
-  const [mobile, setMobile] = useState(false)
+function CoverflowSlider({ slides }) {
+  const [active, setActive]   = useState(0)
+  const [mobile, setMobile]   = useState(false)
+  const [videoId, setVideoId] = useState(null)
   const timerRef = useRef(null)
-  const n = SLIDES.length
+  const n = slides.length
 
   useEffect(() => {
     const check = () => setMobile(window.innerWidth < 640)
@@ -49,65 +48,111 @@ function CoverflowSlider() {
 
   const go = useCallback((dir) => { setActive(a => (a + dir + n) % n); startTimer() }, [n, startTimer])
 
-  const cfg = mobile ? CFG_MOB : CFG_DESK
+  const cfg    = mobile ? CFG_MOB : CFG_DESK
   const maxPos = mobile ? 1 : 2
 
   return (
-    <section className="relative w-full select-none pb-12">
-      <div className="relative mx-auto flex items-center justify-center overflow-hidden" style={{ height: mobile ? 340 : 500 }}>
-        {SLIDES.map((slide, i) => {
-          let p = ((i - active + n) % n)
-          if (p > n / 2) p -= n
-          if (Math.abs(p) > maxPos) return null
-          const c = cfg[String(p)]
-          return (
-            <div
-              key={i}
-              onClick={() => { setActive(i); startTimer() }}
-              className="absolute cursor-pointer"
-              style={{
-                transform: `translateX(${c.x}px) scale(${c.scale})`,
-                opacity: c.opacity,
-                zIndex: c.z,
-                transition: 'transform 0.52s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.52s ease',
-                willChange: 'transform, opacity',
-              }}
-            >
+    <>
+      <section className="relative w-full select-none pb-12">
+        <div className="relative mx-auto flex items-center justify-center overflow-hidden" style={{ height: mobile ? 340 : 500 }}>
+          {slides.map((slide, i) => {
+            let p = ((i - active + n) % n)
+            if (p > n / 2) p -= n
+            if (Math.abs(p) > maxPos) return null
+            const c        = cfg[String(p)]
+            const vid      = getYouTubeId(slide.video_url)
+            const isCenter = p === 0
+
+            return (
               <div
-                className={`relative overflow-hidden rounded-3xl bg-gradient-to-b ${slide.bg} shadow-xl`}
-                style={{ width: mobile ? 180 : 240, height: mobile ? 300 : 420 }}
+                key={slide.id}
+                onClick={() => { setActive(i); startTimer() }}
+                className="absolute cursor-pointer"
+                style={{
+                  transform: `translateX(${c.x}px) scale(${c.scale})`,
+                  opacity: c.opacity,
+                  zIndex: c.z,
+                  transition: 'transform 0.52s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.52s ease',
+                  willChange: 'transform, opacity',
+                }}
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                <div className="absolute top-8 right-8 h-20 w-20 rounded-full bg-white/20 blur-xl" />
-                <div className="absolute top-24 left-5 h-12 w-12 rounded-full bg-white/15 blur-lg" />
-                <div className="absolute bottom-0 left-0 right-0 p-5">
-                  <p className="text-white/75 text-xs font-medium mb-1">{slide.sub}</p>
-                  <p className="text-white font-bold text-lg leading-snug">{slide.label}</p>
+                <div
+                  className="relative overflow-hidden rounded-3xl shadow-xl bg-muted"
+                  style={{ width: mobile ? 180 : 240, height: mobile ? 300 : 420 }}
+                >
+                  <img
+                    src={slide.image_url}
+                    alt={`স্লাইড ${i + 1}`}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                  {vid && isCenter && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setVideoId(vid) }}
+                      aria-label="ভিডিও চালান"
+                      className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors"
+                    >
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-lg">
+                        <Play className="h-6 w-6 fill-primary text-primary ml-1" />
+                      </div>
+                    </button>
+                  )}
+                  {vid && !isCenter && (
+                    <div className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/60">
+                      <Play className="h-3.5 w-3.5 fill-white text-white ml-0.5" />
+                    </div>
+                  )}
                 </div>
               </div>
+            )
+          })}
+        </div>
+
+        <button onClick={() => go(-1)} aria-label="আগের স্লাইড"
+          className="absolute left-2 sm:left-4 top-1/2 -translate-y-8 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:border-primary hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <button onClick={() => go(1)} aria-label="পরের স্লাইড"
+          className="absolute right-2 sm:right-4 top-1/2 -translate-y-8 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:border-primary hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <ChevronRight className="h-5 w-5" />
+        </button>
+
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
+          {slides.map((_, i) => (
+            <button key={i} onClick={() => { setActive(i); startTimer() }}
+              aria-label={`স্লাইড ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${i === active ? 'w-5 bg-primary' : 'w-1.5 bg-muted-foreground/30'}`}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* YouTube modal */}
+      {videoId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setVideoId(null)}
+        >
+          <div className="relative w-full max-w-3xl" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setVideoId(null)}
+              aria-label="বন্ধ করুন"
+              className="absolute -top-10 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="aspect-video w-full overflow-hidden rounded-xl shadow-2xl">
+              <iframe
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="h-full w-full border-0"
+              />
             </div>
-          )
-        })}
-      </div>
-
-      <button onClick={() => go(-1)} aria-label="আগের স্লাইড"
-        className="absolute left-2 sm:left-4 top-1/2 -translate-y-8 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:border-primary hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-      <button onClick={() => go(1)} aria-label="পরের স্লাইড"
-        className="absolute right-2 sm:right-4 top-1/2 -translate-y-8 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:border-primary hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <ChevronRight className="h-5 w-5" />
-      </button>
-
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
-        {SLIDES.map((_, i) => (
-          <button key={i} onClick={() => { setActive(i); startTimer() }}
-            aria-label={`স্লাইড ${i + 1}`}
-            className={`h-1.5 rounded-full transition-all duration-300 ${i === active ? 'w-5 bg-primary' : 'w-1.5 bg-muted-foreground/30'}`}
-          />
-        ))}
-      </div>
-    </section>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -125,14 +170,18 @@ export default function Home() {
   const [products, setProducts]     = useState([])
   const [categories, setCategories] = useState([])
   const [blogPosts, setBlogPosts]   = useState([])
+  const [slides, setSlides]         = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
 
   const q = searchParams.get('q')?.trim() || ''
 
   useEffect(() => {
-    Promise.all([api.getProducts(), api.getCategories(), api.getBlogPosts()])
-      .then(([prods, cats, posts]) => { setProducts(prods); setCategories(cats); setBlogPosts(posts) })
+    Promise.all([api.getProducts(), api.getCategories(), api.getBlogPosts(), api.getSliders()])
+      .then(([prods, cats, posts, sliderData]) => {
+        setProducts(prods); setCategories(cats); setBlogPosts(posts)
+        setSlides(Array.isArray(sliderData) ? sliderData : [])
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -147,7 +196,7 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
 
-      {!q && <CoverflowSlider />}
+      {!q && slides.length > 0 && <CoverflowSlider slides={slides} />}
 
       {/* Category section — dynamic */}
       {!q && categories.length > 0 && (
