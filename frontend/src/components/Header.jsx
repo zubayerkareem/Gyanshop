@@ -1,13 +1,19 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { ShoppingCart, Phone, Mail, Package, Search } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
+
+const NAV_LINKS = [
+  { to: '/',     label: 'হোম' },
+  { to: '/blog', label: 'ব্লগ' },
+]
 
 export default function Header() {
   const { items } = useCart()
   const count = items.reduce((s, i) => s + i.quantity, 0)
   const [query, setQuery] = useState('')
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const location  = useLocation()
 
   function handleSearch(e) {
     e.preventDefault()
@@ -84,6 +90,28 @@ export default function Header() {
               </span>
             )}
           </Link>
+        </div>
+      </div>
+
+      {/* Nav bar */}
+      <div className="border-b border-border bg-background">
+        <div className="mx-auto flex h-9 max-w-6xl items-center gap-1 px-4">
+          {NAV_LINKS.map(({ to, label }) => {
+            const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={`px-3 py-1 rounded text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  isActive
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {label}
+              </Link>
+            )
+          })}
         </div>
       </div>
     </header>

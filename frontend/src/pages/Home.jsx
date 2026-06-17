@@ -215,9 +215,10 @@ export default function Home() {
             </h2>
             <div className="h-px flex-1 bg-border" />
           </div>
+          {/* Show only 3 latest, link to full archive */}
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {blogPosts.map((post, i) => (
+            {blogPosts.slice(0, 3).map((post, i) => (
               <Link
                 key={post.id}
                 to={`/blog/${post.slug}`}
@@ -259,6 +260,17 @@ export default function Home() {
               </Link>
             ))}
           </div>
+
+          {blogPosts.length > 3 && (
+            <div className="mt-8 text-center">
+              <Link
+                to="/blog"
+                className="inline-flex items-center gap-2 rounded-[6px] border border-border px-5 py-2 text-sm font-semibold text-foreground hover:border-primary hover:text-primary transition-colors"
+              >
+                সব পোস্ট দেখুন →
+              </Link>
+            </div>
+          )}
         </section>
       )}
     </div>
