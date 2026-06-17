@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { ShoppingCart, Phone, Mail, Package, Search } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 
@@ -11,9 +11,14 @@ const NAV_LINKS = [
 export default function Header() {
   const { items } = useCart()
   const count = items.reduce((s, i) => s + i.quantity, 0)
-  const [query, setQuery] = useState('')
-  const navigate  = useNavigate()
-  const location  = useLocation()
+  const navigate      = useNavigate()
+  const location      = useLocation()
+  const [searchParams] = useSearchParams()
+  const [query, setQuery] = useState(() => searchParams.get('q') || '')
+
+  useEffect(() => {
+    setQuery(searchParams.get('q') || '')
+  }, [searchParams])
 
   function handleSearch(e) {
     e.preventDefault()

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import ProductCard from '@/components/ProductCard'
-import { Loader2, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, LayoutGrid, X } from 'lucide-react'
 
 // ── Coverflow Slider ──────────────────────────────────────
 const SLIDES = [
@@ -121,11 +121,14 @@ const COVER_GRADIENTS = [
 ]
 
 export default function Home() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [products, setProducts]     = useState([])
   const [categories, setCategories] = useState([])
   const [blogPosts, setBlogPosts]   = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
+
+  const q = searchParams.get('q')?.trim() || ''
 
   useEffect(() => {
     Promise.all([api.getProducts(), api.getCategories(), api.getBlogPosts()])
@@ -134,13 +137,20 @@ export default function Home() {
       .finally(() => setLoading(false))
   }, [])
 
+  const displayed = q
+    ? products.filter(p =>
+        p.name?.toLowerCase().includes(q.toLowerCase()) ||
+        p.description?.toLowerCase().includes(q.toLowerCase())
+      )
+    : products
+
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
 
-      <CoverflowSlider />
+      {!q && <CoverflowSlider />}
 
       {/* Category section — dynamic */}
-      {categories.length > 0 && (
+      {!q && categories.length > 0 && (
         <section className="py-8">
           <div className="mb-6 flex items-center gap-4">
             <div className="h-px flex-1 bg-border" />
@@ -168,14 +178,37 @@ export default function Home() {
         </section>
       )}
 
+      {/* Search results banner */}
+      {q && !loading && (
+        <div className="mb-6 mt-4 flex items-center justify-between gap-3 rounded-[6px] border border-border bg-muted/40 px-4 py-3">
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">"{q}"</span>
+            {' — '}
+            {displayed.length > 0
+              ? <span>{displayed.length}টি পণ্য পাওয়া গেছে</span>
+              : <span className="text-muted-foreground">কোনো পণ্য পাওয়া যায়নি</span>
+            }
+          </p>
+          <button
+            onClick={() => setSearchParams({})}
+            className="flex items-center gap-1.5 rounded text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+            ক্লিয়ার
+          </button>
+        </div>
+      )}
+
       {/* Divider */}
-      <div className="mb-8 flex items-center gap-4">
-        <div className="h-px flex-1 bg-border" />
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-          সকল পণ্য
-        </h2>
-        <div className="h-px flex-1 bg-border" />
-      </div>
+      {!q && (
+        <div className="mb-8 flex items-center gap-4">
+          <div className="h-px flex-1 bg-border" />
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+            সকল পণ্য
+          </h2>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+      )}
 
       {/* States */}
       {loading && (
@@ -190,23 +223,33 @@ export default function Home() {
         </div>
       )}
 
-      {!loading && !error && products.length === 0 && (
-        <p className="py-24 text-center text-sm text-muted-foreground">
-          কোনো পণ্য পাওয়া যায়নি।
-        </p>
+      {!loading && !error && displayed.length === 0 && (
+        <div className="py-24 text-center">
+          <p className="text-sm text-muted-foreground mb-3">
+            {q ? `"${q}" এর জন্য কোনো পণ্য পাওয়া যায়নি।` : 'কোনো পণ্য পাওয়া যায়নি।'}
+          </p>
+          {q && (
+            <button
+              onClick={() => setSearchParams({})}
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              সব পণ্য দেখুন
+            </button>
+          )}
+        </div>
       )}
 
       {/* Product grid */}
-      {!loading && products.length > 0 && (
+      {!loading && displayed.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {products.map(p => (
+          {displayed.map(p => (
             <ProductCard key={p.id} product={p} />
           ))}
         </div>
       )}
 
       {/* Blog section */}
-      {blogPosts.length > 0 && (
+      {!q && blogPosts.length > 0 && (
         <section className="mt-16">
           <div className="mb-8 flex items-center gap-4">
             <div className="h-px flex-1 bg-border" />
