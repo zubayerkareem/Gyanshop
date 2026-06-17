@@ -11,6 +11,7 @@ import OrderSuccess from '@/pages/OrderSuccess'
 import { lazy, Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
 import StaticPage from '@/pages/StaticPage'
+import BlogPost from '@/pages/BlogPost'
 import AdminLogin from '@/pages/admin/Login'
 const Dashboard = lazy(() => import('@/pages/admin/Dashboard'))
 
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/checkout" element={<PublicLayout><Checkout /></PublicLayout>} />
             <Route path="/order-success" element={<PublicLayout><OrderSuccess /></PublicLayout>} />
             <Route path="/page/:slug" element={<PublicLayout><StaticPage /></PublicLayout>} />
+            <Route path="/blog/:slug" element={<PublicLayout><BlogPost /></PublicLayout>} />
 
             {/* Admin routes — no public layout */}
             <Route path="/admin" element={<AdminLogin />} />

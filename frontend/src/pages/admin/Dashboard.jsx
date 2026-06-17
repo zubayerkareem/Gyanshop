@@ -25,7 +25,7 @@ import {
   ShoppingBag, Settings, Pencil, Upload, ImageIcon, LayoutTemplate,
   LayoutDashboard, ShoppingCart, TrendingUp, Users, DollarSign,
   Menu, X, ChevronRight, ArrowUpRight, Clock, LayoutGrid, FileText,
-  Download, Search, Phone, Mail, MapPin, UserCog, Shield, KeyRound,
+  Download, Search, Phone, Mail, MapPin, UserCog, Shield, KeyRound, Newspaper, Eye, EyeOff,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -1776,7 +1776,7 @@ function CustomersTab() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-base font-semibold text-foreground">গ্রাহকসমূহ</h2>
+          <h2 className="text-base font-semibold text-foreground">কাস্টমার লিস্ট</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             {customers.length} জন গ্রাহক · মোট বিক্রয় {formatPrice(totalRevenue)}
           </p>
@@ -1891,6 +1891,290 @@ function CustomersTab() {
           </Table>
         </div>
       </Card>
+    </div>
+  )
+}
+
+// ── Blog Tab ──────────────────────────────────────────────
+function slugify(str) {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+}
+
+const EMPTY_POST = { title: '', slug: '', excerpt: '', content: '', cover_image: '', category: '', read_time: '', published: false }
+
+function BlogTab() {
+  const [posts, setPosts]           = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [mode, setMode]             = useState('list') // 'list' | 'new' | 'edit'
+  const [editing, setEditing]       = useState(null)
+  const [form, setForm]             = useState(EMPTY_POST)
+  const [saving, setSaving]         = useState(false)
+  const [deleting, setDeleting]     = useState(null)
+  const [confirmId, setConfirmId]   = useState(null)
+  const [error, setError]           = useState(null)
+  const [uploading, setUploading]   = useState(false)
+
+  function fetchPosts() {
+    setLoading(true); setError(null)
+    api.adminGetBlogPosts()
+      .then(setPosts)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { fetchPosts() }, [])
+
+  function openNew() {
+    setForm(EMPTY_POST); setEditing(null); setError(null); setMode('new')
+  }
+
+  function openEdit(post) {
+    setForm({
+      title:       post.title,
+      slug:        post.slug,
+      excerpt:     post.excerpt     || '',
+      content:     post.content     || '',
+      cover_image: post.cover_image || '',
+      category:    post.category    || '',
+      read_time:   post.read_time   || '',
+      published:   !!parseInt(post.published),
+    })
+    setEditing(post); setError(null); setMode('edit')
+  }
+
+  function handleChange(e) {
+    const { name, value, type, checked } = e.target
+    setForm(prev => {
+      const next = { ...prev, [name]: type === 'checkbox' ? checked : value }
+      if (name === 'title' && mode === 'new') next.slug = slugify(value)
+      return next
+    })
+  }
+
+  async function handleCoverUpload(file) {
+    setUploading(true); setError(null)
+    try {
+      const { url } = await api.uploadImage(file)
+      setForm(prev => ({ ...prev, cover_image: url }))
+    } catch (err) { setError(err.message) }
+    finally { setUploading(false) }
+  }
+
+  async function handleSave(e) {
+    e.preventDefault(); setSaving(true); setError(null)
+    try {
+      if (mode === 'new') {
+        await api.adminCreateBlogPost(form)
+      } else {
+        await api.adminUpdateBlogPost(editing.id, form)
+      }
+      fetchPosts(); setMode('list')
+    } catch (err) { setError(err.message) }
+    finally { setSaving(false) }
+  }
+
+  async function handleDelete() {
+    if (!confirmId) return
+    setDeleting(confirmId); setConfirmId(null)
+    try {
+      await api.adminDeleteBlogPost(confirmId)
+      setPosts(prev => prev.filter(p => p.id !== confirmId))
+    } catch (err) { setError(err.message) }
+    finally { setDeleting(null) }
+  }
+
+  async function togglePublish(post) {
+    try {
+      await api.adminUpdateBlogPost(post.id, { published: !parseInt(post.published) })
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, published: post.published ? 0 : 1 } : p))
+    } catch (err) { setError(err.message) }
+  }
+
+  // ── Form view ──
+  if (mode === 'new' || mode === 'edit') {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setMode('list')} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+            ← ফিরে যান
+          </button>
+          <h2 className="text-base font-semibold">{mode === 'new' ? 'নতুন পোস্ট' : 'পোস্ট সম্পাদনা'}</h2>
+        </div>
+
+        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+
+        <form onSubmit={handleSave} className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>শিরোনাম *</Label>
+              <Input name="title" required value={form.title} onChange={handleChange} placeholder="পোস্টের শিরোনাম" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>স্লাগ *</Label>
+              <Input name="slug" required value={form.slug} onChange={handleChange} placeholder="post-slug" className="font-mono text-sm" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>ক্যাটাগরি</Label>
+              <Input name="category" value={form.category} onChange={handleChange} placeholder="ফ্যাশন, টিপস, যত্ন..." />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>পড়ার সময়</Label>
+              <Input name="read_time" value={form.read_time} onChange={handleChange} placeholder="৫ মিনিট" />
+            </div>
+
+            <div className="space-y-1.5 flex items-end">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Switch
+                  checked={form.published}
+                  onCheckedChange={v => setForm(prev => ({ ...prev, published: v }))}
+                />
+                <span className="text-sm font-medium">{form.published ? 'প্রকাশিত' : 'ড্রাফট'}</span>
+              </label>
+            </div>
+
+            {/* Cover image upload */}
+            <div className="space-y-2 sm:col-span-2">
+              <Label>কভার ছবি</Label>
+              <div className="flex items-center gap-3">
+                <Button type="button" variant="outline" size="sm" className="gap-2"
+                  disabled={uploading} onClick={() => document.getElementById('blog-cover-input').click()}>
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  ছবি আপলোড
+                </Button>
+                <input id="blog-cover-input" type="file" accept="image/*" className="hidden"
+                  onChange={e => e.target.files[0] && handleCoverUpload(e.target.files[0])} />
+                {form.cover_image && (
+                  <Button type="button" variant="ghost" size="sm" className="text-destructive"
+                    onClick={() => setForm(prev => ({ ...prev, cover_image: '' }))}>
+                    সরিয়ে দিন
+                  </Button>
+                )}
+              </div>
+              {form.cover_image && (
+                <img src={form.cover_image} alt="cover" className="mt-2 h-36 rounded-lg object-cover border border-border" />
+              )}
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>সারসংক্ষেপ</Label>
+              <Textarea name="excerpt" value={form.excerpt} onChange={handleChange} rows={2} placeholder="পোস্টের সংক্ষিপ্ত বিবরণ..." />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>বিষয়বস্তু</Label>
+              <RichEditor
+                content={form.content}
+                onChange={html => setForm(prev => ({ ...prev, content: html }))}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button type="submit" disabled={saving || uploading} className="gap-2">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {mode === 'new' ? 'পোস্ট প্রকাশ করুন' : 'পরিবর্তন সংরক্ষণ'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setMode('list')}>বাতিল</Button>
+          </div>
+        </form>
+      </div>
+    )
+  }
+
+  // ── List view ──
+  return (
+    <div className="space-y-5">
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">মোট {posts.length}টি পোস্ট</p>
+        <Button onClick={openNew} className="gap-2" size="sm">
+          <Plus className="h-4 w-4" />
+          নতুন পোস্ট
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
+      ) : posts.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">কোনো পোস্ট নেই। নতুন পোস্ট তৈরি করুন।</p>
+      ) : (
+        <div className="rounded-md border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-20">কভার</TableHead>
+                <TableHead>শিরোনাম</TableHead>
+                <TableHead className="hidden sm:table-cell">ক্যাটাগরি</TableHead>
+                <TableHead>স্ট্যাটাস</TableHead>
+                <TableHead className="text-right">অ্যাকশন</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {posts.map(post => (
+                <TableRow key={post.id}>
+                  <TableCell>
+                    {post.cover_image
+                      ? <img src={post.cover_image} alt={post.title} className="h-12 w-16 rounded object-cover border border-border" />
+                      : <div className="h-12 w-16 rounded bg-muted flex items-center justify-center border border-border">
+                          <Newspaper className="h-5 w-5 text-muted-foreground/40" />
+                        </div>
+                    }
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium text-sm line-clamp-1">{post.title}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{post.slug}</p>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                    {post.category || '—'}
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      onClick={() => togglePublish(post)}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border transition-colors ${parseInt(post.published) ? 'bg-green-100 text-green-800 border-green-300' : 'bg-muted text-muted-foreground border-border'}`}
+                    >
+                      {parseInt(post.published) ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      {parseInt(post.published) ? 'প্রকাশিত' : 'ড্রাফট'}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(post)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
+                        disabled={deleting === post.id} onClick={() => setConfirmId(post.id)}>
+                        {deleting === post.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Dialog open={!!confirmId} onOpenChange={() => setConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>পোস্ট মুছবেন?</DialogTitle>
+            <DialogDescription>এই ব্লগ পোস্টটি চিরতরে মুছে ফেলা হবে।</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">বাতিল</Button></DialogClose>
+            <Button variant="destructive" onClick={handleDelete}>হ্যাঁ, মুছুন</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -2047,10 +2331,11 @@ function ModeratorsTab() {
 const NAV = [
   { id: 'overview',    label: 'ওভারভিউ',     Icon: LayoutDashboard },
   { id: 'orders',      label: 'অর্ডারসমূহ',  Icon: ShoppingCart    },
-  { id: 'customers',   label: 'গ্রাহকসমূহ',  Icon: Users            },
+  { id: 'customers',   label: 'কাস্টমার লিস্ট', Icon: Users            },
   { id: 'products',    label: 'পণ্যসমূহ',    Icon: Package          },
   { id: 'categories',  label: 'ক্যাটাগরি',   Icon: LayoutGrid,       adminOnly: true },
   { id: 'pages',       label: 'পেজসমূহ',     Icon: FileText,         adminOnly: true },
+  { id: 'blog',        label: 'ব্লগ পোস্ট',  Icon: Newspaper,        adminOnly: true },
   { id: 'footer',      label: 'ফুটার',       Icon: LayoutTemplate,  adminOnly: true },
   { id: 'settings',    label: 'সেটিংস',     Icon: Settings,         adminOnly: true },
   { id: 'moderators',  label: 'মডারেটর',     Icon: UserCog,          adminOnly: true },
@@ -2075,6 +2360,7 @@ export default function Dashboard() {
     products:   <ProductsTab />,
     categories: <CategoriesTab />,
     pages:      <PagesTab />,
+    blog:       <BlogTab />,
     footer:     <FooterTab />,
     settings:   <SettingsTab />,
     moderators: <ModeratorsTab />,

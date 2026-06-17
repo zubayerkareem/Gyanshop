@@ -73,4 +73,14 @@ export const api = {
   adminGetModerators:   ()     => request('/api/admin/moderators'),
   adminCreateModerator: (body) => request('/api/admin/moderators', { method: 'POST', body: JSON.stringify(body) }),
   adminDeleteModerator: (id)   => request(`/api/admin/moderators?id=${id}`, { method: 'DELETE' }),
+
+  // Blog — public
+  getBlogPosts: ()     => fetch(`${BASE}/api/public/blog`, { cache: 'no-store' }).then(r => r.json()),
+  getBlogPost:  (slug) => fetch(`${BASE}/api/public/blog?slug=${slug}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : r.json().then(b => Promise.reject(b.error || 'পোস্ট পাওয়া যায়নি'))),
+
+  // Blog — admin
+  adminGetBlogPosts:  ()        => request('/api/admin/blog'),
+  adminCreateBlogPost:(body)    => request('/api/admin/blog', { method: 'POST', body: JSON.stringify(body) }),
+  adminUpdateBlogPost:(id, body)=> request(`/api/admin/blog?id=${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  adminDeleteBlogPost:(id)      => request(`/api/admin/blog?id=${id}`, { method: 'DELETE' }),
 }

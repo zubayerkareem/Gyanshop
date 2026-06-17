@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import ProductCard from '@/components/ProductCard'
 import { Loader2, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react'
@@ -110,46 +111,25 @@ function CoverflowSlider() {
   )
 }
 
-// ── Blog posts (static) ───────────────────────────────────
-const BLOG_POSTS = [
-  {
-    id: 1,
-    title: 'কীভাবে সঠিক পোশাক বেছে নেবেন — সম্পূর্ণ গাইড',
-    excerpt: 'পোশাক কেনার সময় কোন বিষয়গুলো মাথায় রাখতে হয়, কাপড়ের মান যাচাই করার উপায় এবং বাজেটের মধ্যে সেরাটি পাওয়ার কৌশল জানুন।',
-    category: 'ফ্যাশন',
-    date: '১০ জুন, ২০২৫',
-    readTime: '৫ মিনিট',
-    gradient: 'from-rose-400 to-pink-600',
-  },
-  {
-    id: 2,
-    title: 'অনলাইনে শপিং করুন নিরাপদে — ৭টি গুরুত্বপূর্ণ টিপস',
-    excerpt: 'অনলাইন শপিংয়ে প্রতারণা থেকে বাঁচতে এবং সঠিক পণ্য পেতে যে বিষয়গুলো অবশ্যই জানা দরকার।',
-    category: 'টিপস',
-    date: '৫ জুন, ২০২৫',
-    readTime: '৪ মিনিট',
-    gradient: 'from-amber-400 to-orange-500',
-  },
-  {
-    id: 3,
-    title: 'গ্রীষ্মকালীন পোশাকের যত্ন — ধোয়া ও সংরক্ষণ পদ্ধতি',
-    excerpt: 'গরমের দিনে পোশাক দ্রুত নষ্ট হয়ে যায়। সঠিক পরিচর্যায় পোশাককে দীর্ঘস্থায়ী করুন এবং রং অক্ষুণ্ণ রাখুন।',
-    category: 'যত্ন',
-    date: '১ জুন, ২০২৫',
-    readTime: '৩ মিনিট',
-    gradient: 'from-teal-400 to-cyan-600',
-  },
+const COVER_GRADIENTS = [
+  'from-rose-400 to-pink-600',
+  'from-amber-400 to-orange-500',
+  'from-teal-400 to-cyan-600',
+  'from-violet-500 to-purple-600',
+  'from-sky-400 to-blue-600',
+  'from-emerald-400 to-green-600',
 ]
 
 export default function Home() {
   const [products, setProducts]     = useState([])
   const [categories, setCategories] = useState([])
+  const [blogPosts, setBlogPosts]   = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
 
   useEffect(() => {
-    Promise.all([api.getProducts(), api.getCategories()])
-      .then(([prods, cats]) => { setProducts(prods); setCategories(cats) })
+    Promise.all([api.getProducts(), api.getCategories(), api.getBlogPosts()])
+      .then(([prods, cats, posts]) => { setProducts(prods); setCategories(cats); setBlogPosts(posts) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -226,52 +206,61 @@ export default function Home() {
       )}
 
       {/* Blog section */}
-      <section className="mt-16">
-        <div className="mb-8 flex items-center gap-4">
-          <div className="h-px flex-1 bg-border" />
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-            ব্লগ ও টিপস
-          </h2>
-          <div className="h-px flex-1 bg-border" />
-        </div>
+      {blogPosts.length > 0 && (
+        <section className="mt-16">
+          <div className="mb-8 flex items-center gap-4">
+            <div className="h-px flex-1 bg-border" />
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+              ব্লগ ও টিপস
+            </h2>
+            <div className="h-px flex-1 bg-border" />
+          </div>
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {BLOG_POSTS.map(post => (
-            <article
-              key={post.id}
-              className="group flex flex-col overflow-hidden rounded-[6px] border border-border bg-card transition-colors hover:border-primary"
-            >
-              {/* Cover */}
-              <div className={`aspect-[16/9] bg-gradient-to-br ${post.gradient} relative overflow-hidden`}>
-                <div className="absolute inset-0 bg-black/10" />
-                <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-white">
-                  {post.category}
-                </span>
-              </div>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {blogPosts.map((post, i) => (
+              <Link
+                key={post.id}
+                to={`/blog/${post.slug}`}
+                className="group flex flex-col overflow-hidden rounded-[6px] border border-border bg-card transition-colors hover:border-primary"
+              >
+                {/* Cover */}
+                <div className="aspect-[16/9] relative overflow-hidden bg-muted">
+                  {post.cover_image
+                    ? <img src={post.cover_image} alt={post.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    : <div className={`h-full w-full bg-gradient-to-br ${COVER_GRADIENTS[i % COVER_GRADIENTS.length]}`}>
+                        <div className="absolute inset-0 bg-black/10" />
+                      </div>
+                  }
+                  {post.category && (
+                    <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                      {post.category}
+                    </span>
+                  )}
+                </div>
 
-              {/* Content */}
-              <div className="flex flex-1 flex-col gap-3 p-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{post.date}</span>
-                  <span>·</span>
-                  <span>{post.readTime}</span>
+                {/* Content */}
+                <div className="flex flex-1 flex-col gap-3 p-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{new Date(post.created_at).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    {post.read_time && <><span>·</span><span>{post.read_time}</span></>}
+                  </div>
+                  <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground group-hover:text-primary transition-colors">
+                    {post.title}
+                  </h3>
+                  {post.excerpt && (
+                    <p className="line-clamp-2 text-xs text-muted-foreground leading-relaxed">
+                      {post.excerpt}
+                    </p>
+                  )}
+                  <div className="mt-auto pt-2">
+                    <span className="text-xs font-semibold text-primary">আরো পড়ুন →</span>
+                  </div>
                 </div>
-                <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground group-hover:text-primary transition-colors">
-                  {post.title}
-                </h3>
-                <p className="line-clamp-2 text-xs text-muted-foreground leading-relaxed">
-                  {post.excerpt}
-                </p>
-                <div className="mt-auto pt-2">
-                  <span className="text-xs font-semibold text-primary">
-                    আরো পড়ুন →
-                  </span>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
